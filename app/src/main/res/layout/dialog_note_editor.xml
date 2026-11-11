@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_main"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/tvEditorTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ملاحظة جديدة"
+        android:textColor="@color/text_primary"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:paddingBottom="16dp" />
+
+    <EditText
+        android:id="@+id/etNoteTitle"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:background="@drawable/bg_glass_card"
+        android:hint="عنوان الملاحظة..."
+        android:textColorHint="@color/text_secondary"
+        android:textColor="@color/text_primary"
+        android:paddingHorizontal="16dp"
+        android:layout_marginBottom="12dp"
+        android:textSize="16sp" />
+
+    <EditText
+        android:id="@+id/etNoteContent"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_glass_card"
+        android:gravity="top|start"
+        android:hint="اكتب تفاصيل ملاحظتك هنا بملء الشاشة..."
+        android:textColorHint="@color/text_secondary"
+        android:textColor="@color/text_primary"
+        android:padding="16dp"
+        android:layout_marginBottom="16dp"
+        android:textSize="15sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end">
+
+        <Button
+            android:id="@+id/btnDeleteNote"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_glass_button"
+            android:text="حذف"
+            android:textColor="#FF5555"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/btnSaveNote"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_glass_button"
+            android:text="حفظ الملاحظة"
+            android:textColor="@color/text_primary" />
+    </LinearLayout>
+
+</LinearLayout>
