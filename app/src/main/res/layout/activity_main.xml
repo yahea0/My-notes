@@ -1,74 +1,160 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_main"
-    android:padding="16dp">
+    android:background="#070708">
 
-    <!-- Header Layout -->
+    <!-- Header -->
     <LinearLayout
         android:id="@+id/headerLayout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="60dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingBottom="12dp">
+        android:paddingHorizontal="16dp">
+
+        <ImageButton
+            android:id="@+id/btnMenu"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_chip_normal"
+            android:src="@android:drawable/ic_menu_sort_by_size"
+            android:contentDescription="Menu" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:gravity="center"
             android:text="ملاحظاتي"
-            android:textColor="@color/text_primary"
-            android:textSize="24sp"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
-        <Button
+        <ImageButton
             android:id="@+id/btnCalculator"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="@drawable/bg_glass_button"
-            android:text="🧮"
-            android:textSize="18sp"
-            android:textColor="@color/text_primary" />
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_chip_normal"
+            android:src="@android:drawable/ic_menu_manage"
+            android:contentDescription="Calculator" />
     </LinearLayout>
 
-    <!-- Search Input -->
-    <EditText
-        android:id="@+id/etSearch"
+    <!-- Search Bar -->
+    <LinearLayout
+        android:id="@+id/searchLayout"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_below="@id/headerLayout"
-        android:background="@drawable/bg_glass_card"
-        android:hint="بحث عن ملاحظات..."
-        android:textColorHint="@color/text_secondary"
-        android:textColor="@color/text_primary"
-        android:paddingHorizontal="16dp"
-        android:layout_marginBottom="12dp"
-        android:textSize="14sp" />
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_chip_normal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp">
 
-    <!-- Notes ListView -->
-    <ListView
-        android:id="@+id/listViewNotes"
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@android:drawable/ic_menu_search"
+            android:contentDescription="Search" />
+
+        <EditText
+            android:id="@+id/etSearch"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@null"
+            android:hint="بحث عن ملاحظة..."
+            android:textColor="#FFFFFF"
+            android:textColorHint="#777780"
+            android:textSize="14sp"
+            android:paddingStart="12dp"
+            android:inputType="text" />
+    </LinearLayout>
+
+    <!-- Categories Tabs -->
+    <HorizontalScrollView
+        android:id="@+id/scrollCategories"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/searchLayout"
+        android:layout_marginTop="12dp"
+        android:scrollbars="none"
+        android:paddingHorizontal="16dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tabAll"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_chip_active"
+                android:text="الكل"
+                android:textColor="#000000"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:paddingHorizontal="20dp"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/tabGeneral"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_chip_normal"
+                android:text="العام"
+                android:textColor="#A0A0AB"
+                android:gravity="center"
+                android:paddingHorizontal="20dp"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/tabWork"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_chip_normal"
+                android:text="العمل"
+                android:textColor="#A0A0AB"
+                android:gravity="center"
+                android:paddingHorizontal="20dp"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/tabStudy"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_chip_normal"
+                android:text="الدراسة"
+                android:textColor="#A0A0AB"
+                android:gravity="center"
+                android:paddingHorizontal="20dp" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Notes RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerViewNotes"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/etSearch"
-        android:layout_above="@id/fabAdd"
-        android:divider="@android:color/transparent"
-        android:dividerHeight="12dp" />
+        android:layout_below="@id/scrollCategories"
+        android:layout_marginTop="16dp"
+        android:paddingHorizontal="16dp"
+        android:clipToPadding="false"
+        android:paddingBottom="90dp" />
 
     <!-- Floating Action Button -->
-    <Button
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabAdd"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_alignParentEnd="true"
-        android:layout_margin="16dp"
-        android:background="@drawable/bg_glass_button"
-        android:text="+"
-        android:textColor="@color/text_primary"
-        android:textSize="28sp"
-        android:textStyle="bold" />
+        android:layout_margin="24dp"
+        android:backgroundTint="#FFFFFF"
+        android:src="@android:drawable/ic_input_add"
+        app:tint="#000000"
+        app:fabSize="normal" />
 
 </RelativeLayout>
