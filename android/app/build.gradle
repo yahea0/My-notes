@@ -26,8 +26,9 @@ apply plugin: 'kotlin-android'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
+    namespace "com.example.my_notes" // <--- تم إضافة هذا السطر لحل المشكلة
     compileSdkVersion 34
-    ndkVersion "26.1.10909125" // تم التحديث لتجنب مشاكل التوافق
+    ndkVersion "26.1.10909125"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -44,7 +45,7 @@ android {
 
     defaultConfig {
         applicationId "com.example.my_notes"
-        minSdkVersion 24 // تم الرفع من 21 إلى 24
+        minSdkVersion 24
         targetSdkVersion 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
