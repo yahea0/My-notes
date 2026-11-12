@@ -524,6 +524,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   // الصوت
   final AudioRecorder _audioRecorder = AudioRecorder();
   bool _isRecording = false;
+  String? _currentlyPlayingPath; // لتتبع الصوت الذي يعمل الآن
+  final AudioPlayer _audioPlayer = AudioPlayer(); // مشغل الصوت
 
   // التثبيت
   bool _isPinned = false;
@@ -547,6 +549,20 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       );
       _isPinned = widget.note!['isPinned'] ?? false;
     }
+
+    // الاستماع لانتهاء الصوت
+    _audioPlayer.onPlayerComplete.listen((event) {
+      if (mounted) {
+        setState(() => _currentlyPlayingPath = null);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    _audioRecorder.dispose();
+    super.dispose();
   }
 
   void _saveNote() async {
@@ -771,28 +787,47 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   // تسجيل صوت
   Future<void> _toggleRecording() async {
     if (_isRecording) {
-      final path = await _audioRecorder.stop();
-      setState(() {
-        _isRecording = false;
-        if (path != null) {
-          _audioRecords.add({'path': path, 'name': 'تسجيل جديد'});
-        }
-      });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الصوت')));
+      // إيقاف التسجيل
+      try {
+        final path = await _audioRecorder.stop();
+        setState(() {
+          _isRecording = false;
+          if (path != null) {
+            _audioRecords.add({'path': path, 'name': 'تسجيل جديد'});
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الصوت')));
+      } catch (e) {
+        setState(() => _isRecording = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+      }
     } else {
-      if (await _audioRecorder.hasPermission()) {
-        final dir = await getApplicationDocumentsDirectory();
-        final path = '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
-        await _audioRecorder.start(const RecordConfig(), path: path);
-        setState(() => _isRecording = true);
+      // بدء التسجيل
+      try {
+        if (await _audioRecorder.hasPermission()) {
+          final dir = await getApplicationDocumentsDirectory();
+          final path = '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+          await _audioRecorder.start(const RecordConfig(), path: path);
+          setState(() => _isRecording = true);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفض إذن الميكروفون')));
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ في بدء التسجيل: $e')));
       }
     }
   }
 
-  // تشغيل الصوت
-  Future<void> _playAudio(String path) async {
-    final player = AudioPlayer();
-    await player.play(DeviceFileSource(path));
+  // تشغيل وإيقاف الصوت
+  Future<void> _togglePlayAudio(String path) async {
+    if (_currentlyPlayingPath == path) {
+      await _audioPlayer.stop();
+      setState(() => _currentlyPlayingPath = null);
+    } else {
+      await _audioPlayer.stop();
+      await _audioPlayer.play(DeviceFileSource(path));
+      setState(() => _currentlyPlayingPath = path);
+    }
   }
 
   // تغيير اسم التسجيل
@@ -998,6 +1033,40 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
+                // شريط التسجيل النشط (يظهر فقط أثناء التسجيل)
+                if (_isRecording)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.red.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.mic, color: Colors.red, size: 28),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'جاري التسجيل الآن...',
+                            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _toggleRecording,
+                          icon: const Icon(Icons.stop, size: 20),
+                          label: const Text('إيقاف'),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 TextField(
                   controller: _titleController,
                   style: titleStyle,
@@ -1053,13 +1122,22 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                   Column(
                     children: List.generate(_audioRecords.length, (index) {
                       final record = _audioRecords[index];
+                      bool isPlayingThis = _currentlyPlayingPath == record['path'];
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
                         child: Row(
                           children: [
-                            IconButton(icon: const Icon(Icons.play_circle, color: Colors.green, size: 30), onPressed: () => _playAudio(record['path']!)),
+                            // زر التشغيل / الإيقاف المؤقت
+                            IconButton(
+                              icon: Icon(
+                                isPlayingThis ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                                color: isPlayingThis ? Colors.red : Colors.green, 
+                                size: 30
+                              ), 
+                              onPressed: () => _togglePlayAudio(record['path']!)
+                            ),
                             Expanded(child: Text(record['name'] ?? 'تسجيل صوتي', style: const TextStyle(color: Colors.white70))),
                             IconButton(icon: const Icon(Icons.edit, color: Colors.blueGrey, size: 20), onPressed: () => _renameAudio(index)),
                             IconButton(icon: const Icon(Icons.close, color: Colors.red, size: 20), onPressed: () => setState(() => _audioRecords.removeAt(index))),
@@ -1080,6 +1158,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             ),
           ),
           
+          // الحاسبة
           if (_isCalcOpen)
             Positioned(
               bottom: 80, left: 20, right: 20,
@@ -1150,14 +1229,17 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 IconButton(icon: const Icon(Icons.image_outlined, color: Colors.white70), onPressed: _pickImages),
+                
+                // زر التسجيل (مايك / إيقاف)
                 IconButton(
-                  icon: Icon(_isRecording ? Icons.stop_circle : Icons.mic_none, color: _isRecording ? Colors.red : Colors.white70), 
+                  icon: Icon(_isRecording ? Icons.stop_circle : Icons.mic_none, color: _isRecording ? Colors.red : Colors.white70, size: _isRecording ? 30 : 24), 
                   onPressed: _toggleRecording
                 ),
+                
                 IconButton(icon: const Icon(Icons.color_lens_outlined, color: Colors.white70), onPressed: _pickColor),
                 IconButton(icon: const Icon(Icons.text_fields, color: Colors.white70), onPressed: _pickFont),
                 IconButton(icon: Icon(Icons.calculate_outlined, color: _isCalcOpen ? Colors.white : Colors.white70), onPressed: () => setState(() => _isCalcOpen = !_isCalcOpen)),
-                IconButton(icon: const Icon(Icons.settings, color: Colors.white70), onPressed: _showSettingsSheet), // زر الإعدادات الجديد
+                IconButton(icon: const Icon(Icons.settings, color: Colors.white70), onPressed: _showSettingsSheet),
                 DropdownButton<String>(
                   value: _selectedCategory,
                   dropdownColor: const Color(0xFF1E1E1E),
