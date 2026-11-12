@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:intl/intl.dart' hide TextDirection; // <--- تم إصلاح الخطأ هنا
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:math_expressions/math_expressions.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -35,7 +35,6 @@ class MyNotesApp extends StatelessWidget {
           centerTitle: true,
         ),
       ),
-      // إجبار التطبيق على الاتجاه العربي
       builder: (context, child) {
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -102,31 +101,73 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String selectedCategory = 'الكل';
+  int _currentIndex = 0;
+  bool _isSearching = false;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // القائمة الجانبية
+      drawer: _buildDrawer(),
+      
       appBar: AppBar(
-        title: const Text('ملاحظاتي', style: TextStyle(fontWeight: FontWeight.bold)),
-        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
-        actions: [IconButton(icon: const Icon(Icons.search), onPressed: () {})],
+        leading: IconButton(
+          icon: const Icon(Icons.menu), 
+          onPressed: () => Scaffold.of(context).openDrawer()
+        ),
+        title: _isSearching 
+          ? TextField(
+              controller: _searchController,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white, fontSize: 18),
+              decoration: const InputDecoration(
+                hintText: 'ابحث عن ملاحظة...',
+                hintStyle: TextStyle(color: Colors.white54),
+                border: InputBorder.none,
+              ),
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val;
+                });
+              },
+            )
+          : Text(_getTitleByIndex(_currentIndex), style: const TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search), 
+            onPressed: () {
+              setState(() {
+                if (_isSearching) {
+                  _isSearching = false;
+                  _searchQuery = '';
+                  _searchController.clear();
+                } else {
+                  _isSearching = true;
+                }
+              });
+            }
+          ),
+        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            height: 50,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _buildCategoryChip('الكل', Icons.apps),
-                _buildCategoryChip('العمل', Icons.work_outline),
-                _buildCategoryChip('الدراسة', Icons.school_outlined),
-                _buildCategoryChip('شخصي', Icons.person_outline),
-              ],
+          if (!_isSearching)
+            SizedBox(
+              height: 50,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  _buildCategoryChip('الكل', Icons.apps),
+                  _buildCategoryChip('العمل', Icons.work_outline),
+                  _buildCategoryChip('الدراسة', Icons.school_outlined),
+                  _buildCategoryChip('شخصي', Icons.person_outline),
+                ],
+              ),
             ),
-          ),
           Expanded(
             child: ValueListenableBuilder(
               valueListenable: Hive.box('notes').listenable(),
@@ -134,10 +175,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 final Map<dynamic, dynamic> rawNotes = box.toMap();
                 final List<MapEntry<dynamic, dynamic>> allNotes = rawNotes.entries.toList();
 
+                // منطق الفلترة (بحث + تصنيف + تابات)
                 final filteredNotes = allNotes.where((entry) {
                   final note = entry.value;
-                  if (selectedCategory == 'الكل') return true;
-                  return note['category'] == selectedCategory;
+                  final title = note['title'] ?? '';
+                  final content = note['content'] ?? '';
+                  final category = note['category'] ?? 'عام';
+                  final isArchived = note['isArchived'] ?? false;
+                  final isFavorite = note['isFavorite'] ?? false;
+
+                  // 1. فلترة البحث
+                  bool matchesSearch = title.contains(_searchQuery) || content.contains(_searchQuery);
+
+                  // 2. فلترة التاب السفلي
+                  bool matchesTab = false;
+                  if (_currentIndex == 0) matchesTab = !isArchived; // الرئيسية (غير المؤرشف)
+                  if (_currentIndex == 1) matchesTab = isArchived; // الأرشيف
+                  if (_currentIndex == 2) matchesTab = isFavorite && !isArchived; // المفضلة
+
+                  // 3. فلترة التصنيف
+                  bool matchesCategory = selectedCategory == 'الكل' || category == selectedCategory;
+
+                  return matchesSearch && matchesTab && matchesCategory;
                 }).toList();
 
                 if (filteredNotes.isEmpty) {
@@ -158,12 +217,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: _currentIndex == 3 ? null : FloatingActionButton(
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AddNoteScreen())),
         backgroundColor: Colors.white,
         child: const Icon(Icons.add, color: Colors.black, size: 30),
       ),
       bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+            _isSearching = false;
+          });
+        },
         backgroundColor: const Color(0xFF121212),
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.white38,
@@ -175,6 +241,68 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'الإعدادات'),
         ],
       ),
+    );
+  }
+
+  String _getTitleByIndex(int index) {
+    switch (index) {
+      case 0: return 'ملاحظاتي';
+      case 1: return 'الأرشيف';
+      case 2: return 'المفضلة';
+      case 3: return 'الإعدادات';
+      default: return 'ملاحظاتي';
+    }
+  }
+
+  Widget _buildDrawer() {
+    return Drawer(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF0F0F0F),
+          border: Border(left: BorderSide(color: Colors.white12)),
+        ),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: Colors.white12)),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Color(0xFF222222),
+                    child: Icon(Icons.person, size: 50, color: Colors.white54),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('ملاحظاتي', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text('نسخة احترافية', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                ],
+              ),
+            ),
+            _buildDrawerItem(Icons.home, 'الرئيسية', () { Navigator.pop(context); setState(() => _currentIndex = 0); }),
+            _buildDrawerItem(Icons.star_border, 'المفضلة', () { Navigator.pop(context); setState(() => _currentIndex = 2); }),
+            _buildDrawerItem(Icons.archive_outlined, 'الأرشيف', () { Navigator.pop(context); setState(() => _currentIndex = 1); }),
+            _buildDrawerItem(Icons.settings_outlined, 'الإعدادات', () { Navigator.pop(context); setState(() => _currentIndex = 3); }),
+            const Divider(color: Colors.white12),
+            _buildDrawerItem(Icons.info_outline, 'حول التطبيق', () {
+              Navigator.pop(context);
+              showAboutDialog(context: context, applicationName: 'ملاحظاتي', applicationVersion: '1.0.0');
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(IconData icon, String title, VoidCallback onTap) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.white70),
+      title: Text(title, style: const TextStyle(color: Colors.white)),
+      onTap: onTap,
     );
   }
 
@@ -198,6 +326,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildNoteCard(Map note, dynamic noteKey, Box box) {
+    bool isFav = note['isFavorite'] ?? false;
     return InkWell(
       onTap: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => AddNoteScreen(note: note, noteKey: noteKey)));
@@ -218,9 +347,34 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(child: Text(note['title'] ?? 'بدون عنوان', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white))),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                  onPressed: () => _showDeleteConfirmation(context, box, noteKey),
+                Row(
+                  children: [
+                    // زر المفضلة
+                    IconButton(
+                      icon: Icon(isFav ? Icons.star : Icons.star_border, color: isFav ? Colors.amber : Colors.white38, size: 22),
+                      onPressed: () {
+                        // تحديث حالة المفضلة
+                        Map updatedNote = Map.from(note);
+                        updatedNote['isFavorite'] = !isFav;
+                        box.put(noteKey, updatedNote);
+                      },
+                    ),
+                    // زر الأرشفة
+                    IconButton(
+                      icon: const Icon(Icons.archive_outlined, color: Colors.white38, size: 20),
+                      onPressed: () {
+                        Map updatedNote = Map.from(note);
+                        updatedNote['isArchived'] = true;
+                        box.put(noteKey, updatedNote);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت الأرشفة')));
+                      },
+                    ),
+                    // زر الحذف
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                      onPressed: () => _showDeleteConfirmation(context, box, noteKey),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -238,21 +392,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 12, color: Colors.white38),
-                        const SizedBox(width: 4),
-                        Text(note['date'] ?? '', style: const TextStyle(fontSize: 11, color: Colors.white38)),
-                      ],
-                    ),
+                    Row(children: [const Icon(Icons.calendar_today, size: 12, color: Colors.white38), const SizedBox(width: 4), Text(note['date'] ?? '', style: const TextStyle(fontSize: 11, color: Colors.white38))]),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.access_time, size: 12, color: Colors.white38),
-                        const SizedBox(width: 4),
-                        Text(note['time'] ?? '', style: const TextStyle(fontSize: 11, color: Colors.white38)),
-                      ],
-                    ),
+                    Row(children: [const Icon(Icons.access_time, size: 12, color: Colors.white38), const SizedBox(width: 4), Text(note['time'] ?? '', style: const TextStyle(fontSize: 11, color: Colors.white38))]),
                   ],
                 ),
               ],
@@ -272,10 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('تأكيد الحذف', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: const Text('هل أنت متأكد من حذف هذه الملاحظة؟', style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء', style: TextStyle(color: Colors.white54))),
           TextButton(
             onPressed: () {
               box.delete(noteKey);
@@ -329,6 +468,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           'category': _selectedCategory,
           'date': dateStr,
           'time': timeStr,
+          'isFavorite': false,
+          'isArchived': false,
         });
       } else {
         Hive.box('notes').put(widget.noteKey, {
@@ -337,6 +478,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           'category': _selectedCategory,
           'date': widget.note!['date'], 
           'time': widget.note!['time'],
+          'isFavorite': widget.note!['isFavorite'] ?? false,
+          'isArchived': widget.note!['isArchived'] ?? false,
         });
       }
       Navigator.pop(context);
@@ -359,7 +502,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           Expression expParsed = p.parse(exp);
           ContextModel cm = ContextModel();
           double eval = expParsed.evaluate(EvaluationType.REAL, cm);
-          
           _calcDisplay = eval.toStringAsFixed(eval.truncateToDouble() == eval ? 0 : 2);
         } catch (e) {
           _calcDisplay = 'خطأ';
@@ -388,7 +530,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           selection: TextSelection.collapsed(offset: selection.start + _calcDisplay.length),
         );
       }
-      
       setState(() => _isCalcOpen = false);
     }
   }
