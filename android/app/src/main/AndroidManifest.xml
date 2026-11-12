@@ -10,6 +10,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    
+    <!-- أذونات الخدمة الأمامية -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:label="My Notes"
@@ -45,8 +49,13 @@
         
         <receiver android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" android:exported="false"/>
         
-        <!-- مستقبل البث المخصص الذي سيعمل حتى لو كان التطبيق مغلقاً -->
-        <receiver android:name=".AlarmReceiver" android:exported="false" />
+        <!-- تسجيل الخدمة الأمامية -->
+        <service
+            android:name=".SnoozeService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+        </service>
 
         <meta-data
             android:name="flutterEmbedding"
