@@ -11,7 +11,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:photo_view/photo_view.dart'; // مكتبة عرض الصور
+import 'package:photo_view/photo_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -372,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
     double fontSize = note['fontSize'] ?? 18.0;
     String? imagePath = note['imagePath'];
     String? audioPath = note['audioPath'];
-    String? audioName = note['audioName']; // اسم التسجيل
+    String? audioName = note['audioName'];
 
     TextStyle titleStyle = TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: textColor);
     if (fontFam == 'Cairo') titleStyle = GoogleFonts.cairo(textStyle: titleStyle);
@@ -406,7 +406,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(child: Text(note['title'] ?? 'بدون عنوان', style: titleStyle)),
                 Row(
                   children: [
-                    // إزالة زر التثبيت من الخارج بناءً على طلبك
                     IconButton(icon: Icon(isFav ? Icons.star : Icons.star_border, color: isFav ? Colors.amber : Colors.white38, size: 22), onPressed: () {
                       Map updatedNote = Map.from(note);
                       updatedNote['isFavorite'] = !isFav;
@@ -505,7 +504,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   String _fontFamily = 'Tahoma';
   double _titleFontSize = 22.0;
   double _contentFontSize = 16.0;
-  bool _styleForTitle = true; // true للعنوان، false للنص
+  bool _styleForTitle = true;
 
   // الوسائط
   String? _imagePath;
@@ -608,7 +607,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
 
   // اختيار الخط
   void _pickFont() {
-    // قائمة بأشهر الخطوط العربية
     final List<Map<String, String>> fonts = [
       {'id': 'Tahoma', 'name': 'افتراضي'},
       {'id': 'Cairo', 'name': 'القاهرة'},
@@ -627,7 +625,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       backgroundColor: const Color(0xFF161616),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return StatefulBuilder( // استخدام StatefulBuilder لتحديث الشريط فوراً
+        return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
               padding: const EdgeInsets.all(16),
@@ -636,7 +634,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 children: [
                   const Text('اختر الخط وحجمه', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   
-                  // خيار: هل التغيير للعنوان أم النص؟
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -659,7 +656,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // قائمة الخطوط
                   SizedBox(
                     height: 100,
                     child: ListView.builder(
@@ -671,7 +667,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                         return GestureDetector(
                           onTap: () {
                             setModalState(() => _fontFamily = f['id']!);
-                            setState(() {}); // تحديث الشاشة الرئيسية أيضاً
+                            setState(() {}); 
                           },
                           child: Container(
                             margin: const EdgeInsets.symmetric(horizontal: 6),
@@ -681,7 +677,13 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.center,
-                            child: Text(f['name']!, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontFamily: f['id'] == 'Tahoma' ? null : f['id'])),
+                            child: Text(
+                              f['name']!, 
+                              style: TextStyle(
+                                color: isSelected ? Colors.black : Colors.white, 
+                                fontFamily: f['id'] == 'Tahoma' ? null : f['id'],
+                              )
+                            ),
                           ),
                         );
                       },
@@ -691,7 +693,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                   const SizedBox(height: 20),
                   Text('حجم الخط (${_styleForTitle ? _titleFontSize.toInt() : _contentFontSize.toInt()})', style: const TextStyle(color: Colors.white)),
                   
-                  // شريط التمرير
                   Slider(
                     value: _styleForTitle ? _titleFontSize : _contentFontSize,
                     min: 12,
@@ -701,7 +702,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                       setModalState(() {
                         if (_styleForTitle) { _titleFontSize = val; } else { _contentFontSize = val; }
                       });
-                      setState(() {}); // تحديث الشاشة الرئيسية
+                      setState(() {});
                     },
                   ),
                 ],
@@ -756,7 +757,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       setState(() {
         _isRecording = false;
         _audioPath = path;
-        _audioName = 'تسجيل جديد'; // اسم افتراضي
+        _audioName = 'تسجيل جديد';
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الصوت')));
     } else {
@@ -843,6 +844,61 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
+  // نافذة الإعدادات الزجاجية
+  void _showSettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF161616).withOpacity(0.8),
+                border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2))),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(color: Colors.white30, borderRadius: BorderRadius.circular(10)),
+                  ),
+                  const SizedBox(height: 20),
+                  ListTile(
+                    leading: const Icon(Icons.alarm, color: Colors.white),
+                    title: const Text('تذكير', style: TextStyle(color: Colors.white)),
+                    onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('قريباً'))); },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.search, color: Colors.white),
+                    title: const Text('البحث عن نص داخل الملاحظة', style: TextStyle(color: Colors.white)),
+                    onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('قريباً'))); },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.copy, color: Colors.white),
+                    title: const Text('إنشاء نسخة', style: TextStyle(color: Colors.white)),
+                    onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('قريباً'))); },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.share, color: Colors.white),
+                    title: const Text('إرسال', style: TextStyle(color: Colors.white)),
+                    onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('قريباً'))); },
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     TextStyle titleStyle = TextStyle(fontSize: _titleFontSize, fontWeight: FontWeight.bold, color: _titleColor);
@@ -859,23 +915,24 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     if (_fontFamily == 'Changa') { titleStyle = GoogleFonts.changa(textStyle: titleStyle); contentStyle = GoogleFonts.changa(textStyle: contentStyle); }
 
     return Scaffold(
-      // منع الكيبورد من تغطية المحتوى
-      resizeToAvoidBottomInset: true, 
+      resizeToAvoidBottomInset: true, // حل مشكلة الكيبورد
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
         title: Text(widget.note == null ? 'ملاحظة جديدة' : 'تعديل الملاحظة'),
         actions: [
-          // زر التثبيت الجديد بجانب علامة الصح
           IconButton(
             icon: Icon(_isPinned ? Icons.push_pin : Icons.push_pin_outlined, color: _isPinned ? Colors.amber : Colors.white),
             onPressed: () => setState(() => _isPinned = !_isPinned),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _showSettingsSheet,
           ),
           IconButton(icon: const Icon(Icons.check, color: Colors.white), onPressed: _saveNote),
         ],
       ),
       body: Stack(
         children: [
-          // تغليف المحتوى بـ SingleChildScrollView لمنع اختفاء النص
           SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -887,23 +944,16 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 ),
                 const Divider(color: Colors.white12),
                 
-                // عرض الصورة المرفقة
                 if (_imagePath != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
                     child: Stack(
                       children: [
-                        // جعل الصورة قابلة للضغط لعرضها بالكامل
                         GestureDetector(
                           onTap: _viewFullImage,
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12), 
-                            child: Image.file(
-                              File(_imagePath!), 
-                              height: 150, 
-                              width: double.infinity, 
-                              fit: BoxFit.cover // تغطية المساحة بالكامل
-                            )
+                            child: Image.file(File(_imagePath!), height: 150, width: double.infinity, fit: BoxFit.cover)
                           ),
                         ),
                         Positioned(top: 0, right: 0, child: IconButton(icon: const Icon(Icons.close, color: Colors.red), onPressed: () => setState(() => _imagePath = null))),
@@ -911,7 +961,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                     ),
                   ),
                 
-                // عرض الصوت المرفق
                 if (_audioPath != null)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -927,7 +976,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                   ),
 
                 const SizedBox(height: 10),
-                // حقل النص
                 TextField(
                   controller: _contentController,
                   maxLines: null,
@@ -938,7 +986,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             ),
           ),
           
-          // الحاسبة العائمة
           if (_isCalcOpen)
             Positioned(
               bottom: 80, left: 20, right: 20,
@@ -997,36 +1044,38 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             ),
         ],
       ),
-      // شريط الأدوات السفلي
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white12)), color: Color(0xFF0A0A0A)),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              IconButton(icon: const Icon(Icons.image_outlined, color: Colors.white70), onPressed: _pickImage),
-              // تغيير شكل زر التسجيل
-              IconButton(
-                icon: Icon(_isRecording ? Icons.stop_circle : Icons.mic_none, color: _isRecording ? Colors.red : Colors.white70), 
-                onPressed: _toggleRecording
-              ),
-              IconButton(icon: const Icon(Icons.color_lens_outlined, color: Colors.white70), onPressed: _pickColor),
-              IconButton(icon: const Icon(Icons.text_fields, color: Colors.white70), onPressed: _pickFont),
-              IconButton(icon: Icon(Icons.calculate_outlined, color: _isCalcOpen ? Colors.white : Colors.white70), onPressed: () => setState(() => _isCalcOpen = !_isCalcOpen)),
-              DropdownButton<String>(
-                value: _selectedCategory,
-                dropdownColor: const Color(0xFF1E1E1E),
-                underline: Container(),
-                icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                style: const TextStyle(color: Colors.white),
-                items: ['عام', 'العمل', 'الدراسة', 'شخصي'].map((String value) {
-                  return DropdownMenuItem<String>(value: value, child: Text(value));
-                }).toList(),
-                onChanged: (newValue) => setState(() => _selectedCategory = newValue!),
-              ),
-            ],
+      // شريط الأدوات السفلي مع مراعاة الكيبورد
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white12)), color: Color(0xFF0A0A0A)),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                IconButton(icon: const Icon(Icons.image_outlined, color: Colors.white70), onPressed: _pickImage),
+                IconButton(
+                  icon: Icon(_isRecording ? Icons.stop_circle : Icons.mic_none, color: _isRecording ? Colors.red : Colors.white70), 
+                  onPressed: _toggleRecording
+                ),
+                IconButton(icon: const Icon(Icons.color_lens_outlined, color: Colors.white70), onPressed: _pickColor),
+                IconButton(icon: const Icon(Icons.text_fields, color: Colors.white70), onPressed: _pickFont),
+                IconButton(icon: Icon(Icons.calculate_outlined, color: _isCalcOpen ? Colors.white : Colors.white70), onPressed: () => setState(() => _isCalcOpen = !_isCalcOpen)),
+                DropdownButton<String>(
+                  value: _selectedCategory,
+                  dropdownColor: const Color(0xFF1E1E1E),
+                  underline: Container(),
+                  icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                  style: const TextStyle(color: Colors.white),
+                  items: ['عام', 'العمل', 'الدراسة', 'شخصي'].map((String value) {
+                    return DropdownMenuItem<String>(value: value, child: Text(value));
+                  }).toList(),
+                  onChanged: (newValue) => setState(() => _selectedCategory = newValue!),
+                ),
+              ],
+            ),
           ),
         ),
       ),
