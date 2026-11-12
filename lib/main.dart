@@ -24,84 +24,13 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-final MethodChannel _ringtoneChannel = const MethodChannel('com.example.my_notes/ringtone');
+final MethodChannel _alarmChannel = const MethodChannel('com.example.my_notes/alarm');
 
-// ==================== دالة معالجة الأزرار في الخلفية (الحل الجذري) ====================
+// ==================== دالة معالجة الأزرار في الخلفية (لم تعد بحاجة لجدولة) ====================
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse notificationResponse) async {
-  // 1. تهيئة المكونات الإضافية في بيئة الخلفية
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // 2. تهيئة المنطقة الزمنية (ضروري جداً في الخلفية)
-  tz.initializeTimeZones();
-  try {
-    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
-  } catch (e) {
-    // في حال فشل جلب المنطقة الزمنية، نستخدم التوقيت المحلي الافتراضي
-    tz.setLocalLocation(tz.local);
-  }
-
-  // 3. إعادة إنشاء نسخة من المكون الإضافي للإشعارات
-  final FlutterLocalNotificationsPlugin localPlugin = FlutterLocalNotificationsPlugin();
-  
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-  const InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-  );
-  
-  await localPlugin.initialize(initializationSettings);
-
-  if (notificationResponse.actionId == 'snooze_action') {
-    // إعادة جدولة الإشعار بعد 5 دقائق
-    final snoozeTime = DateTime.now().add(const Duration(minutes: 5));
-    
-    try {
-      await localPlugin.zonedSchedule(
-        notificationResponse.id ?? 0,
-        notificationResponse.payload ?? 'تذكير بملاحظة',
-        'لديك تذكير في هذا الوقت (غفوة)',
-        tz.TZDateTime.from(snoozeTime, tz.local),
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            'reminder_alarm_channel_v3',
-            'المنبهات المستمرة',
-            channelDescription: 'منبهات لا تتوقف حتى يتم إيقافها',
-            importance: Importance.max,
-            priority: Priority.high,
-            playSound: true,
-            enableVibration: true,
-            category: AndroidNotificationCategory.alarm,
-            fullScreenIntent: true,
-            ongoing: true,
-            autoCancel: false,
-            additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT
-            sound: const RawResourceAndroidNotificationSound('default'),
-            actions: <AndroidNotificationAction>[
-              const AndroidNotificationAction(
-                'dismiss_action',
-                'إيقاف',
-                cancelNotification: true,
-                showsUserInterface: false,
-              ),
-              const AndroidNotificationAction(
-                'snooze_action',
-                'غفوة (5 دقائق)',
-                cancelNotification: true,
-                showsUserInterface: false,
-              ),
-            ],
-          ),
-        ),
-        payload: notificationResponse.payload,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      );
-    } catch (e) {
-      print("Error in background snooze: $e");
-    }
-  }
+  // تم نقل منطق الغفوة بالكامل إلى Kotlin (AlarmManager)
+  // هذه الدالة تبقى فارغة أو لمنطق آخر إذا لزم الأمر.
 }
 
 void main() async {
@@ -829,7 +758,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
 
       String? ringtoneUri;
       try {
-        ringtoneUri = await _ringtoneChannel.invokeMethod('getRingtoneUri');
+        ringtoneUri = await _alarmChannel.invokeMethod('getRingtoneUri');
       } catch (e) {
         print("خطأ في جلب نغمة النظام: $e");
       }
@@ -841,8 +770,11 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ? scheduledDate.add(const Duration(days: 1)) 
           : scheduledDate;
 
+      // معرف الإشعار الفريد
+      final notificationId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+
       await flutterLocalNotificationsPlugin.zonedSchedule(
-        DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        notificationId,
         _titleController.text.isEmpty ? 'تذكير بملاحظة' : _titleController.text,
         _contentController.text.isEmpty ? 'لديك تذكير في هذا الوقت' : _contentController.text,
         tz.TZDateTime.from(finalDate, tz.local),
@@ -867,9 +799,10 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
               const AndroidNotificationAction(
                 'dismiss_action',
                 'إيقاف',
-                cancelNotification: true,
+                cancelNotification: true, // يمسح الإشعار فوراً
                 showsUserInterface: false,
               ),
+              // تم تغيير إجراء الغفوة ليعمل عبر Kotlin
               const AndroidNotificationAction(
                 'snooze_action',
                 'غفوة (5 دقائق)',
@@ -883,6 +816,10 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
+
+      // تسجيل الإجراء في Kotlin (خيار احتياطي إذا لم يعمل الـ ActionBroadcastReceiver)
+      // هذا ليس ضرورياً إذا كان الـ ActionBroadcastReceiver يعمل، لكنه قد يساعد في بعض الأجهزة.
+      // (تم إزالته لتجنب التعقيد، وسنعتمد على ActionBroadcastReceiver و AlarmReceiver)
 
       if (mounted) {
         Navigator.pop(context);
