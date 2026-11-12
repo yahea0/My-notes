@@ -4,8 +4,14 @@ import 'package:path_provider/path_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // تهيئة قاعدة البيانات المحلية
   final appDocumentDir = await getApplicationDocumentsDirectory();
   Hive.init(appDocumentDir.path);
+  
+  // فتح صندوق الملاحظات (هذا هو السطر الذي كان يسبب اللبس، تم دمجه هنا)
+  await Hive.openBox('notes'); 
+  
   runApp(const MyNotesApp());
 }
 
@@ -19,7 +25,7 @@ class MyNotesApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0A0A0A), // أسود مطفي فخم
+        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
         primaryColor: Colors.white,
         fontFamily: 'Tahoma',
         appBarTheme: const AppBarTheme(
@@ -42,14 +48,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late Box notesBox;
   String selectedCategory = 'الكل';
-
-  @override
-  void initState() {
-    super.initState();
-    notesBox = Hive.box('notes'); // فتح صندوق الملاحظات
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: () {}, // سيتم تفعيلها لاحقاً للقائمة الجانبية
+          onPressed: () {},
         ),
         actions: [
           IconButton(
@@ -89,10 +88,14 @@ class _HomeScreenState extends State<HomeScreen> {
           // قائمة الملاحظات
           Expanded(
             child: ValueListenableBuilder(
-              valueListenable: notesBox.listenable(),
+              valueListenable: Hive.box('notes').listenable(),
               builder: (context, Box box, _) {
+                final Map<dynamic, dynamic> rawNotes = box.toMap();
+                final List<MapEntry<dynamic, dynamic>> allNotes = rawNotes.entries.toList();
+
                 // تصفية الملاحظات حسب التصنيف
-                final filteredNotes = box.values.where((note) {
+                final filteredNotes = allNotes.where((entry) {
+                  final note = entry.value;
                   if (selectedCategory == 'الكل') return true;
                   return note['category'] == selectedCategory;
                 }).toList();
@@ -107,8 +110,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.only(bottom: 100),
                   itemCount: filteredNotes.length,
                   itemBuilder: (context, index) {
-                    final note = filteredNotes[index];
-                    return _buildNoteCard(note, box.keyAt(box.values.toList().indexOf(note)));
+                    final note = filteredNotes[index].value;
+                    final noteKey = filteredNotes[index].key;
+                    return _buildNoteCard(note, noteKey, box);
                   },
                 );
               },
@@ -175,12 +179,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildNoteCard(Map note, int index) {
+  Widget _buildNoteCard(Map note, dynamic noteKey, Box box) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF161616), // رمادي داكن جداً
+        color: const Color(0xFF161616),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white10),
       ),
@@ -197,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
                 onPressed: () {
-                  Hive.box('notes').deleteAt(index); // حذف الملاحظة
+                  box.delete(noteKey); // حذف الملاحظة بشكل صحيح
                 },
               ),
             ],
@@ -262,9 +266,9 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                   'title': _titleController.text,
                   'content': _contentController.text,
                   'category': _selectedCategory,
-                  'date': '2026/11/12', // يمكن جلب التاريخ الحقيقي لاحقاً
+                  'date': '2026/11/12',
                 });
-                Navigator.pop(context); // العودة للشاشة الرئيسية
+                Navigator.pop(context);
               }
             },
           ),
@@ -298,7 +302,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 ),
               ),
             ),
-            // شريط الأدوات السفلي (أزرار الصور والصوت وغيرها)
+            // شريط الأدوات السفلي
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: const BoxDecoration(
