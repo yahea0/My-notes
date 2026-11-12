@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection; // <--- تم إصلاح الخطأ هنا
 import 'package:math_expressions/math_expressions.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -376,7 +376,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
 
   void _insertResult() {
     if (_calcDisplay != 'خطأ') {
-      // طريقة صحيحة لإدراج النص في مكان المؤشر
       final text = _contentController.text;
       final selection = _contentController.selection;
       
