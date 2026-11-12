@@ -45,7 +45,7 @@
         
         <receiver android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" android:exported="false"/>
         
-        <!-- مستقبل البث المخصص لجدولة الغفوة عبر AlarmManager -->
+        <!-- مستقبل البث المخصص الذي سيعمل حتى لو كان التطبيق مغلقاً -->
         <receiver android:name=".AlarmReceiver" android:exported="false" />
 
         <meta-data
