@@ -13,6 +13,9 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   path_provider: ^2.1.2
+  math_expressions: ^2.4.0   # لحساب العمليات الرياضية
+  intl: ^0.19.0              # لتنسيق التاريخ والوقت
+  image_picker: ^1.0.7       # لاختيار الصور من المعرض
 
 dev_dependencies:
   flutter_test:
