@@ -17,30 +17,26 @@ import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:share_plus/share_plus.dart';
 
-// استيراد مكتبات الإشعارات
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 
-// متغير عام للتحكم بالإشعارات
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+final MethodChannel _ringtoneChannel = const MethodChannel('com.example.my_notes/ringtone');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // تهيئة قاعدة البيانات
   final appDocumentDir = await getApplicationDocumentsDirectory();
   Hive.init(appDocumentDir.path);
   await Hive.openBox('notes'); 
 
-  // تهيئة الإشعارات والمنطقة الزمنية
   await _initNotifications();
 
   runApp(const MyNotesApp());
 }
 
-// دالة تهيئة الإشعارات
 Future<void> _initNotifications() async {
   tz.initializeTimeZones();
   final String timeZoneName = await FlutterTimezone.getLocalTimezone();
@@ -61,7 +57,6 @@ Future<void> _initNotifications() async {
     },
   );
 
-  // طلب إذن الإشعارات والمنبهات
   final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
       flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
@@ -71,8 +66,33 @@ Future<void> _initNotifications() async {
   }
 }
 
-class MyNotesApp extends StatelessWidget {
+class MyNotesApp extends StatefulWidget {
   const MyNotesApp({Key? key}) : super(key: key);
+
+  @override
+  State<MyNotesApp> createState() => _MyNotesAppState();
+}
+
+class _MyNotesAppState extends State<MyNotesApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
+    if (state == AppLifecycleState.resumed) {
+      // مسح جميع الإشعارات عند فتح التطبيق
+      await flutterLocalNotificationsPlugin.cancelAll();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -688,7 +708,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنشاء نسخة من الملاحظة')));
   }
 
-  // دالة التذكير المعدلة (منبه مستمر - تم إزالة const)
+  // دالة التذكير المعدلة (نغمة النظام + أزرار الإشعار)
   void _setReminder() async {
     final TimeOfDay? time = await showTimePicker(
       context: context,
@@ -729,6 +749,14 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
 
       await androidPlugin?.requestFullScreenIntentPermission();
 
+      // جلب نغمة النظام من Kotlin
+      String? ringtoneUri;
+      try {
+        ringtoneUri = await _ringtoneChannel.invokeMethod('getRingtoneUri');
+      } catch (e) {
+        print("خطأ في جلب نغمة النظام: $e");
+      }
+
       final now = DateTime.now();
       final scheduledDate = DateTime(now.year, now.month, now.day, time.hour, time.minute);
       
@@ -736,15 +764,15 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ? scheduledDate.add(const Duration(days: 1)) 
           : scheduledDate;
 
-      // الحل: إزالة const من NotificationDetails و AndroidNotificationDetails
+      // إعداد المنبه مع أزرار الإجراءات
       await flutterLocalNotificationsPlugin.zonedSchedule(
         DateTime.now().millisecondsSinceEpoch.remainder(100000),
         _titleController.text.isEmpty ? 'تذكير بملاحظة' : _titleController.text,
         _contentController.text.isEmpty ? 'لديك تذكير في هذا الوقت' : _contentController.text,
         tz.TZDateTime.from(finalDate, tz.local),
-        NotificationDetails( // <--- تم إزالة const
-          android: AndroidNotificationDetails( // <--- تم إزالة const
-            'reminder_alarm_channel_v2', // معرف قناة جديد
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'reminder_alarm_channel_v3',
             'المنبهات المستمرة',
             channelDescription: 'منبهات لا تتوقف حتى يتم إيقافها',
             importance: Importance.max,
@@ -755,7 +783,26 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             fullScreenIntent: true,
             ongoing: true,
             autoCancel: false,
-            additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT = 4 (الرنين المستمر)
+            additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT
+            // استخدام نغمة النظام إذا تم جلبها بنجاح
+            sound: ringtoneUri != null 
+                ? UriAndroidNotificationSound(ringtoneUri) 
+                : const RawResourceAndroidNotificationSound('default'),
+            // إضافة أزرار الإجراءات
+            actions: <AndroidNotificationAction>[
+              const AndroidNotificationAction(
+                'dismiss_action',
+                'إيقاف',
+                cancelNotification: true,
+                showsUserInterface: false,
+              ),
+              const AndroidNotificationAction(
+                'snooze_action',
+                'غفوة (5 دقائق)',
+                cancelNotification: true,
+                showsUserInterface: false,
+              ),
+            ],
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
