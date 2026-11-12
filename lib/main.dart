@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart'; // ضروري لـ DartPluginRegistrant
+import 'package:flutter/widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -26,11 +26,11 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final MethodChannel _ringtoneChannel = const MethodChannel('com.example.my_notes/ringtone');
 
-// ==================== دالة معالجة الأزرار في الخلفية (مُصححة) ====================
+// ==================== دالة معالجة الأزرار في الخلفية ====================
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse notificationResponse) async {
   // 1. تهيئة المكونات الإضافية في بيئة الخلفية
-  DartPluginRegistrant.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
   
   // 2. تهيئة المنطقة الزمنية (لأنها لا تُنقل تلقائياً للخلفية)
   tz.initializeTimeZones();
@@ -64,7 +64,6 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
             ongoing: true,
             autoCancel: false,
             additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT
-            // استخدام نغمة النظام الافتراضية للمنبه
             sound: const RawResourceAndroidNotificationSound('default'),
             actions: <AndroidNotificationAction>[
               const AndroidNotificationAction(
@@ -87,11 +86,9 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
     } catch (e) {
-      // يمكنك تسجيل الخطأ هنا إذا أردت
       print("Error snoozing notification: $e");
     }
   }
-  // زر "إيقاف" سيتم إغلاق الإشعار تلقائياً بسبب cancelNotification: true
 }
 
 void main() async {
@@ -124,7 +121,6 @@ Future<void> _initNotifications() async {
     onDidReceiveNotificationResponse: (NotificationResponse response) {
       // يمكن إضافة منطق عند الضغط على الإشعار في الواجهة هنا
     },
-    // ربط دالة الخلفية هنا
     onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
   );
 
@@ -160,7 +156,6 @@ class _MyNotesAppState extends State<MyNotesApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     if (state == AppLifecycleState.resumed) {
-      // مسح جميع الإشعارات عند فتح التطبيق
       await flutterLocalNotificationsPlugin.cancelAll();
     }
   }
@@ -779,7 +774,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنشاء نسخة من الملاحظة')));
   }
 
-  // دالة التذكير المعدلة (نغمة النظام + أزرار الإشعار)
   void _setReminder() async {
     final TimeOfDay? time = await showTimePicker(
       context: context,
@@ -834,7 +828,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ? scheduledDate.add(const Duration(days: 1)) 
           : scheduledDate;
 
-      // إعداد المنبه
       await flutterLocalNotificationsPlugin.zonedSchedule(
         DateTime.now().millisecondsSinceEpoch.remainder(100000),
         _titleController.text.isEmpty ? 'تذكير بملاحظة' : _titleController.text,
@@ -853,7 +846,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             fullScreenIntent: true,
             ongoing: true,
             autoCancel: false,
-            additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT
+            additionalFlags: Int32List.fromList([4]),
             sound: ringtoneUri != null 
                 ? UriAndroidNotificationSound(ringtoneUri) 
                 : const RawResourceAndroidNotificationSound('default'),
@@ -861,19 +854,19 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
               const AndroidNotificationAction(
                 'dismiss_action',
                 'إيقاف',
-                cancelNotification: true, // يمسح الإشعار فوراً
+                cancelNotification: true,
                 showsUserInterface: false,
               ),
               const AndroidNotificationAction(
                 'snooze_action',
                 'غفوة (5 دقائق)',
-                cancelNotification: true, // يمسح الإشعار الحالي، والدالة في الخلفية ستنشئ واحداً جديداً
+                cancelNotification: true,
                 showsUserInterface: false,
               ),
             ],
           ),
         ),
-        payload: _titleController.text, // تمرير العنوان للاستخدام في الغفوة
+        payload: _titleController.text,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
