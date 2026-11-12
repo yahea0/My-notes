@@ -31,6 +31,9 @@ android {
     ndkVersion "26.1.10909125"
 
     compileOptions {
+        // 1. تفعيل ميزة Core Library Desugaring
+        coreLibraryDesugaringEnabled true
+        
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -54,8 +57,8 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.debug
-            minifyEnabled false      // تعطيل تصغير الكود
-            shrinkResources false    // تعطيل حذف الموارد غير المستخدمة
+            minifyEnabled false
+            shrinkResources false
         }
     }
 }
@@ -66,4 +69,6 @@ flutter {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    // 2. إضافة مكتبة الـ Desugaring المطلوبة
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
 }
