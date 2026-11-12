@@ -370,25 +370,39 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNoteCard(Map note, dynamic noteKey, Box box) {
     bool isFav = note['isFavorite'] ?? false;
     bool isPinned = note['isPinned'] ?? false;
-    Color textColor = note['textColor'] != null ? Color(note['textColor']) : Colors.white;
+    
+    // جلب الألوان والخطوط للعنوان والمحتوى
+    Color titleColor = note['textColor'] != null ? Color(note['textColor']) : Colors.white;
+    Color contentColor = note['contentColor'] != null ? Color(note['contentColor']) : Colors.white;
     String fontFam = note['fontFamily'] ?? 'Tahoma';
-    double fontSize = note['titleFontSize'] ?? 18.0;
+    double titleSize = note['titleFontSize'] ?? 18.0;
+    double contentSize = note['contentFontSize'] ?? 14.0;
+    
     List<dynamic> imagePaths = note['imagePaths'] ?? [];
     List<dynamic> audioRecords = note['audioRecords'] ?? [];
 
-    TextStyle titleStyle = TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: textColor);
-    if (fontFam == 'Cairo') titleStyle = GoogleFonts.cairo(textStyle: titleStyle);
-    if (fontFam == 'Amiri') titleStyle = GoogleFonts.amiri(textStyle: titleStyle);
-    if (fontFam == 'Tajawal') titleStyle = GoogleFonts.tajawal(textStyle: titleStyle);
-    if (fontFam == 'Almarai') titleStyle = GoogleFonts.almarai(textStyle: titleStyle);
-    if (fontFam == 'Noto Naskh Arabic') titleStyle = GoogleFonts.notoNaskhArabic(textStyle: titleStyle);
-    if (fontFam == 'Reem Kufi') titleStyle = GoogleFonts.reemKufi(textStyle: titleStyle);
-    if (fontFam == 'El Messiri') titleStyle = GoogleFonts.elMessiri(textStyle: titleStyle);
-    if (fontFam == 'Markazi Text') titleStyle = GoogleFonts.markaziText(textStyle: titleStyle);
-    if (fontFam == 'Changa') titleStyle = GoogleFonts.changa(textStyle: titleStyle);
-    if (fontFam == 'Aref Ruqaa') titleStyle = GoogleFonts.arefRuqaa(textStyle: titleStyle);
-    if (fontFam == 'Lateef') titleStyle = GoogleFonts.lateef(textStyle: titleStyle);
-    if (fontFam == 'Scheherazade New') titleStyle = GoogleFonts.scheherazadeNew(textStyle: titleStyle);
+    // تطبيق التنسيق على العنوان
+    TextStyle titleStyle = TextStyle(fontSize: titleSize, fontWeight: FontWeight.bold, color: titleColor);
+    // تطبيق التنسيق على النص (هذا ما كان ناقصاً)
+    TextStyle contentStyle = TextStyle(fontSize: contentSize, color: contentColor.withOpacity(0.8), height: 1.5);
+
+    // دالة مساعدة لتطبيق الخط على كلا النصين
+    void applyFont(String fontId) {
+      if (fontId == 'Cairo') { titleStyle = GoogleFonts.cairo(textStyle: titleStyle); contentStyle = GoogleFonts.cairo(textStyle: contentStyle); }
+      if (fontId == 'Amiri') { titleStyle = GoogleFonts.amiri(textStyle: titleStyle); contentStyle = GoogleFonts.amiri(textStyle: contentStyle); }
+      if (fontId == 'Tajawal') { titleStyle = GoogleFonts.tajawal(textStyle: titleStyle); contentStyle = GoogleFonts.tajawal(textStyle: contentStyle); }
+      if (fontId == 'Almarai') { titleStyle = GoogleFonts.almarai(textStyle: titleStyle); contentStyle = GoogleFonts.almarai(textStyle: contentStyle); }
+      if (fontId == 'Noto Naskh Arabic') { titleStyle = GoogleFonts.notoNaskhArabic(textStyle: titleStyle); contentStyle = GoogleFonts.notoNaskhArabic(textStyle: contentStyle); }
+      if (fontId == 'Reem Kufi') { titleStyle = GoogleFonts.reemKufi(textStyle: titleStyle); contentStyle = GoogleFonts.reemKufi(textStyle: contentStyle); }
+      if (fontId == 'El Messiri') { titleStyle = GoogleFonts.elMessiri(textStyle: titleStyle); contentStyle = GoogleFonts.elMessiri(textStyle: contentStyle); }
+      if (fontId == 'Markazi Text') { titleStyle = GoogleFonts.markaziText(textStyle: titleStyle); contentStyle = GoogleFonts.markaziText(textStyle: contentStyle); }
+      if (fontId == 'Changa') { titleStyle = GoogleFonts.changa(textStyle: titleStyle); contentStyle = GoogleFonts.changa(textStyle: contentStyle); }
+      if (fontId == 'Aref Ruqaa') { titleStyle = GoogleFonts.arefRuqaa(textStyle: titleStyle); contentStyle = GoogleFonts.arefRuqaa(textStyle: contentStyle); }
+      if (fontId == 'Lateef') { titleStyle = GoogleFonts.lateef(textStyle: titleStyle); contentStyle = GoogleFonts.lateef(textStyle: contentStyle); }
+      if (fontId == 'Scheherazade New') { titleStyle = GoogleFonts.scheherazadeNew(textStyle: titleStyle); contentStyle = GoogleFonts.scheherazadeNew(textStyle: contentStyle); }
+    }
+    
+    applyFont(fontFam);
 
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNoteScreen(note: note, noteKey: noteKey))),
@@ -446,7 +460,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             const SizedBox(height: 8),
-            Text(note['content'] ?? '', style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.7), height: 1.5), maxLines: 2, overflow: TextOverflow.ellipsis),
+            // تطبيق التنسيق على النص
+            Text(
+              note['content'] ?? '', 
+              style: contentStyle, 
+              maxLines: 2, 
+              overflow: TextOverflow.ellipsis
+            ),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -505,7 +525,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   late TextEditingController _contentController;
   String _selectedCategory = 'عام';
   
-  // التنسيق
   Color _titleColor = Colors.white;
   Color _contentColor = Colors.white;
   String _fontFamily = 'Tahoma';
@@ -513,20 +532,16 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   double _contentFontSize = 16.0;
   bool _styleForTitle = true;
 
-  // الوسائط المتعددة
   List<String> _imagePaths = [];
   List<Map<String, String>> _audioRecords = [];
 
-  // الحاسبة (متغيرات محلية)
   String _calcDisplay = '0';
 
-  // الصوت
   final AudioRecorder _audioRecorder = AudioRecorder();
   bool _isRecording = false;
   String? _currentlyPlayingPath;
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  // التثبيت
   bool _isPinned = false;
 
   @override
@@ -596,7 +611,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
-  // اختيار لون
   void _pickColor() {
     Color currentColor = _styleForTitle ? _titleColor : _contentColor;
     showDialog(
@@ -625,7 +639,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     );
   }
 
-  // اختيار الخط
   void _pickFont() {
     final List<Map<String, String>> fonts = [
       {'id': 'Tahoma', 'name': 'افتراضي'},
@@ -736,7 +749,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     );
   }
 
-  // اختيار صور متعددة
   Future<void> _pickImages() async {
     final ImagePicker picker = ImagePicker();
     final List<XFile> images = await picker.pickMultiImage();
@@ -747,7 +759,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
-  // عرض معرض الصور
   void _viewGallery(int initialIndex) {
     if (_imagePaths.isEmpty) return;
     showDialog(
@@ -782,7 +793,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     );
   }
 
-  // تسجيل صوت
   Future<void> _toggleRecording() async {
     if (_isRecording) {
       try {
@@ -814,7 +824,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
-  // تشغيل وإيقاف الصوت
   Future<void> _togglePlayAudio(String path) async {
     if (_currentlyPlayingPath == path) {
       await _audioPlayer.stop();
@@ -826,7 +835,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
-  // تغيير اسم التسجيل
   void _renameAudio(int index) {
     TextEditingController _controller = TextEditingController(text: _audioRecords[index]['name']);
     showDialog(
@@ -853,7 +861,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     );
   }
 
-  // دالة إدراج النتيجة في النص
   void _insertResult(String result) {
     if (result != 'خطأ') {
       final text = _contentController.text;
@@ -867,9 +874,9 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
-  // نافذة الحاسبة (محدثة كلياً لتعمل كنافذة منبثقة احترافية)
+  // === تصميم الحاسبة الجديد (مضغوط وفخم) ===
   void _showCalculatorDialog() {
-    _calcDisplay = '0'; // تصفير الحاسبة عند الفتح
+    _calcDisplay = '0'; 
     showDialog(
       context: context,
       builder: (context) {
@@ -877,12 +884,12 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           builder: (context, setModalState) {
             return Dialog(
               backgroundColor: Colors.transparent,
-              insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100), // إزالة المساحات الزائدة
               child: GlassContainer(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12), // تقليل الحشو
                 borderRadius: 24,
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisSize: MainAxisSize.min, // ضغط المحتوى
                   children: [
                     // الشريط العلوي
                     Row(
@@ -892,9 +899,9 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                         GestureDetector(
                           onTap: () => Navigator.pop(context),
                           child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: Colors.white24)),
-                            child: const Icon(Icons.close, color: Colors.white, size: 20),
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(color: Colors.white10, shape: BoxShape.circle, border: Border.all(color: Colors.white24)),
+                            child: const Icon(Icons.close, color: Colors.white, size: 18),
                           ),
                         ),
                       ],
@@ -904,54 +911,69 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                     // شاشة العرض
                     Container(
                       alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                      child: Text(_calcDisplay, style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold)),
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
+                      width: double.infinity,
+                      child: Text(_calcDisplay, style: const TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     
-                    // الأزرار
+                    // الأزرار (تصميم فخم)
                     GridView.count(
                       shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(), // لمنع التمرير داخل النافذة
+                      physics: const NeverScrollableScrollPhysics(),
                       crossAxisCount: 4,
                       mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
-                      childAspectRatio: 1.2, // تناسب حجم الأزرار
+                      childAspectRatio: 1.1,
                       children: ['C', '⌫', '%', '÷', '7', '8', '9', '×', '4', '5', '6', '−', '1', '2', '3', '+', '0', '.', '='].map((e) {
                         bool isEq = e == '=';
-                        return InkWell(
-                          onTap: () {
-                            setModalState(() {
-                              if (e == 'C') {
-                                _calcDisplay = '0';
-                              } else if (e == '⌫') {
-                                if (_calcDisplay.isNotEmpty && _calcDisplay != '0') {
-                                  _calcDisplay = _calcDisplay.substring(0, _calcDisplay.length - 1);
-                                  if (_calcDisplay.isEmpty) _calcDisplay = '0';
-                                }
-                              } else if (e == '=') {
-                                try {
-                                  String exp = _calcDisplay.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
-                                  Parser p = Parser();
-                                  Expression expParsed = p.parse(exp);
-                                  ContextModel cm = ContextModel();
-                                  double eval = expParsed.evaluate(EvaluationType.REAL, cm);
-                                  _calcDisplay = eval.toStringAsFixed(eval.truncateToDouble() == eval ? 0 : 2);
-                                } catch (err) {
-                                  _calcDisplay = 'خطأ';
-                                }
-                              } else {
-                                if (_calcDisplay == '0' && e != '.') {
-                                  _calcDisplay = e;
+                        bool isOp = ['C', '⌫', '%', '÷', '×', '−', '+'].contains(e);
+                        
+                        return Material(
+                          color: isEq ? Colors.white : (isOp ? Colors.white24 : Colors.white.withOpacity(0.05)),
+                          borderRadius: BorderRadius.circular(16),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: () {
+                              setModalState(() {
+                                if (e == 'C') {
+                                  _calcDisplay = '0';
+                                } else if (e == '⌫') {
+                                  if (_calcDisplay.isNotEmpty && _calcDisplay != '0') {
+                                    _calcDisplay = _calcDisplay.substring(0, _calcDisplay.length - 1);
+                                    if (_calcDisplay.isEmpty) _calcDisplay = '0';
+                                  }
+                                } else if (e == '=') {
+                                  try {
+                                    String exp = _calcDisplay.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
+                                    Parser p = Parser();
+                                    Expression expParsed = p.parse(exp);
+                                    ContextModel cm = ContextModel();
+                                    double eval = expParsed.evaluate(EvaluationType.REAL, cm);
+                                    _calcDisplay = eval.toStringAsFixed(eval.truncateToDouble() == eval ? 0 : 2);
+                                  } catch (err) {
+                                    _calcDisplay = 'خطأ';
+                                  }
                                 } else {
-                                  _calcDisplay += e;
+                                  if (_calcDisplay == '0' && e != '.') {
+                                    _calcDisplay = e;
+                                  } else {
+                                    _calcDisplay += e;
+                                  }
                                 }
-                              }
-                            });
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(color: isEq ? Colors.white : Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
-                            child: Center(child: Text(e, style: TextStyle(fontSize: 20, color: isEq ? Colors.black : Colors.white))),
+                              });
+                            },
+                            child: Center(
+                              child: Text(
+                                e, 
+                                style: TextStyle(
+                                  fontSize: 22, 
+                                  fontWeight: isEq || isOp ? FontWeight.bold : FontWeight.normal,
+                                  color: isEq ? Colors.black : Colors.white
+                                )
+                              )
+                            ),
                           ),
                         );
                       }).toList(),
@@ -961,19 +983,19 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                     // زر الإدراج
                     SizedBox(
                       width: double.infinity,
+                      height: 48,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         onPressed: () {
                           _insertResult(_calcDisplay);
-                          Navigator.pop(context); // إغلاق النافذة
+                          Navigator.pop(context);
                         },
-                        icon: const Icon(Icons.input, size: 18),
-                        label: const Text('إدراج النتيجة في النص', style: TextStyle(fontWeight: FontWeight.bold)),
+                        icon: const Icon(Icons.input, size: 20),
+                        label: const Text('إدراج النتيجة في النص', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       ),
                     ),
                   ],
@@ -986,7 +1008,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     );
   }
 
-  // نافذة الإعدادات الزجاجية
   void _showSettingsSheet() {
     showModalBottomSheet(
       context: context,
@@ -1054,7 +1075,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     );
   }
 
-  // نافذة البحث داخل الملاحظة
   void _showSearchDialog() {
     TextEditingController searchController = TextEditingController();
     showDialog(
@@ -1117,11 +1137,10 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           IconButton(icon: const Icon(Icons.check, color: Colors.white), onPressed: _saveNote),
         ],
       ),
-      body: SingleChildScrollView( // تم إزالة Stack لأن الحاسبة أصبحت Dialog
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // شريط التسجيل النشط
             if (_isRecording)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -1162,7 +1181,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             ),
             const Divider(color: Colors.white12),
             
-            // معرض الصور المصغر
             if (_imagePaths.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
@@ -1205,7 +1223,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 ),
               ),
             
-            // قائمة التسجيلات الصوتية
             if (_audioRecords.isNotEmpty)
               Column(
                 children: List.generate(_audioRecords.length, (index) {
@@ -1244,7 +1261,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ],
         ),
       ),
-      // شريط الأدوات السفلي
       bottomNavigationBar: Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
@@ -1256,19 +1272,13 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 IconButton(icon: const Icon(Icons.image_outlined, color: Colors.white70), onPressed: _pickImages),
-                
-                // زر التسجيل (مايك / إيقاف)
                 IconButton(
                   icon: Icon(_isRecording ? Icons.stop_circle : Icons.mic_none, color: _isRecording ? Colors.red : Colors.white70, size: _isRecording ? 30 : 24), 
                   onPressed: _toggleRecording
                 ),
-                
                 IconButton(icon: const Icon(Icons.color_lens_outlined, color: Colors.white70), onPressed: _pickColor),
                 IconButton(icon: const Icon(Icons.text_fields, color: Colors.white70), onPressed: _pickFont),
-                
-                // زر الحاسبة (يستدعي النافذة المنبثقة الآن)
                 IconButton(icon: const Icon(Icons.calculate_outlined, color: Colors.white70), onPressed: _showCalculatorDialog),
-                
                 IconButton(icon: const Icon(Icons.settings, color: Colors.white70), onPressed: _showSettingsSheet),
                 DropdownButton<String>(
                   value: _selectedCategory,
@@ -1314,7 +1324,7 @@ class GlassContainer extends StatelessWidget {
             border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 30, spreadRadius: 5)],
           ),
-          child: Center(child: child),
+          child: child, // إزالة Center لأننا نحتاج التحكم في الأحجام
         ),
       ),
     );
