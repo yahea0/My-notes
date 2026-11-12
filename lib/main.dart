@@ -26,19 +26,32 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final MethodChannel _ringtoneChannel = const MethodChannel('com.example.my_notes/ringtone');
 
-// ==================== دالة معالجة الأزرار في الخلفية ====================
+// ==================== دالة معالجة الأزرار في الخلفية (الحل الجذري) ====================
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse notificationResponse) async {
   // 1. تهيئة المكونات الإضافية في بيئة الخلفية
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 2. تهيئة المنطقة الزمنية (لأنها لا تُنقل تلقائياً للخلفية)
+  // 2. تهيئة المنطقة الزمنية (ضروري جداً في الخلفية)
   tz.initializeTimeZones();
-  final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-  tz.setLocalLocation(tz.getLocation(timeZoneName));
+  try {
+    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
+  } catch (e) {
+    // في حال فشل جلب المنطقة الزمنية، نستخدم التوقيت المحلي الافتراضي
+    tz.setLocalLocation(tz.local);
+  }
 
   // 3. إعادة إنشاء نسخة من المكون الإضافي للإشعارات
   final FlutterLocalNotificationsPlugin localPlugin = FlutterLocalNotificationsPlugin();
+  
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+  );
+  
+  await localPlugin.initialize(initializationSettings);
 
   if (notificationResponse.actionId == 'snooze_action') {
     // إعادة جدولة الإشعار بعد 5 دقائق
@@ -86,7 +99,7 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
     } catch (e) {
-      print("Error snoozing notification: $e");
+      print("Error in background snooze: $e");
     }
   }
 }
@@ -846,7 +859,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             fullScreenIntent: true,
             ongoing: true,
             autoCancel: false,
-            additionalFlags: Int32List.fromList([4]),
+            additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT
             sound: ringtoneUri != null 
                 ? UriAndroidNotificationSound(ringtoneUri) 
                 : const RawResourceAndroidNotificationSound('default'),
@@ -866,7 +879,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             ],
           ),
         ),
-        payload: _titleController.text,
+        payload: _titleController.text, // تمرير العنوان للاستخدام في الغفوة
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
