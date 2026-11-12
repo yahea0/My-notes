@@ -16,12 +16,58 @@ import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:share_plus/share_plus.dart';
 
+// استيراد مكتبات الإشعارات
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
+
+// متغير عام للتحكم بالإشعارات
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // تهيئة قاعدة البيانات
   final appDocumentDir = await getApplicationDocumentsDirectory();
   Hive.init(appDocumentDir.path);
   await Hive.openBox('notes'); 
+
+  // تهيئة الإشعارات والمنطقة الزمنية
+  await _initNotifications();
+
   runApp(const MyNotesApp());
+}
+
+// دالة تهيئة الإشعارات
+Future<void> _initNotifications() async {
+  tz.initializeTimeZones();
+  final String timeZoneName = await FlutterTimezone.getLocalTimezone();
+  tz.setLocalLocation(tz.getLocation(timeZoneName));
+
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: DarwinInitializationSettings(),
+  );
+
+  await flutterLocalNotificationsPlugin.initialize(
+    initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) {
+      // يمكن إضافة منطق عند الضغط على الإشعار هنا
+    },
+  );
+
+  // طلب إذن الإشعارات لأندرويد 13+
+  final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+      flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+  if (androidImplementation != null) {
+    await androidImplementation.requestNotificationsPermission();
+    await androidImplementation.requestExactAlarmsPermission();
+  }
 }
 
 class MyNotesApp extends StatelessWidget {
@@ -42,6 +88,12 @@ class MyNotesApp extends StatelessWidget {
           elevation: 0,
           iconTheme: IconThemeData(color: Colors.white),
           centerTitle: true,
+        ),
+        // تخصيص لون تحديد النص ليكون أبيض
+        textSelectionTheme: TextSelectionThemeData(
+          cursorColor: Colors.white,
+          selectionColor: Colors.white.withOpacity(0.4),
+          selectionHandleColor: Colors.white,
         ),
       ),
       builder: (context, child) {
@@ -371,7 +423,6 @@ class _HomeScreenState extends State<HomeScreen> {
     bool isFav = note['isFavorite'] ?? false;
     bool isPinned = note['isPinned'] ?? false;
     
-    // جلب الألوان والخطوط للعنوان والمحتوى
     Color titleColor = note['textColor'] != null ? Color(note['textColor']) : Colors.white;
     Color contentColor = note['contentColor'] != null ? Color(note['contentColor']) : Colors.white;
     String fontFam = note['fontFamily'] ?? 'Tahoma';
@@ -381,12 +432,9 @@ class _HomeScreenState extends State<HomeScreen> {
     List<dynamic> imagePaths = note['imagePaths'] ?? [];
     List<dynamic> audioRecords = note['audioRecords'] ?? [];
 
-    // تطبيق التنسيق على العنوان
     TextStyle titleStyle = TextStyle(fontSize: titleSize, fontWeight: FontWeight.bold, color: titleColor);
-    // تطبيق التنسيق على النص (هذا ما كان ناقصاً)
     TextStyle contentStyle = TextStyle(fontSize: contentSize, color: contentColor.withOpacity(0.8), height: 1.5);
 
-    // دالة مساعدة لتطبيق الخط على كلا النصين
     void applyFont(String fontId) {
       if (fontId == 'Cairo') { titleStyle = GoogleFonts.cairo(textStyle: titleStyle); contentStyle = GoogleFonts.cairo(textStyle: contentStyle); }
       if (fontId == 'Amiri') { titleStyle = GoogleFonts.amiri(textStyle: titleStyle); contentStyle = GoogleFonts.amiri(textStyle: contentStyle); }
@@ -460,7 +508,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             const SizedBox(height: 8),
-            // تطبيق التنسيق على النص
             Text(
               note['content'] ?? '', 
               style: contentStyle, 
@@ -523,6 +570,7 @@ class AddNoteScreen extends StatefulWidget {
 class _AddNoteScreenState extends State<AddNoteScreen> {
   late TextEditingController _titleController;
   late TextEditingController _contentController;
+  final ScrollController _contentScrollController = ScrollController();
   String _selectedCategory = 'عام';
   
   Color _titleColor = Colors.white;
@@ -575,9 +623,11 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   void dispose() {
     _audioPlayer.dispose();
     _audioRecorder.dispose();
+    _contentScrollController.dispose();
     super.dispose();
   }
 
+  // حفظ الملاحظة
   void _saveNote() async {
     if (_titleController.text.isNotEmpty || _contentController.text.isNotEmpty) {
       final now = DateTime.now();
@@ -609,6 +659,141 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       }
       Navigator.pop(context);
     }
+  }
+
+  // إنشاء نسخة من الملاحظة
+  void _duplicateNote() {
+    final now = DateTime.now();
+    final dateStr = DateFormat('yyyy/MM/dd').format(now);
+    final timeStr = DateFormat('hh:mm a').format(now);
+
+    Map<String, dynamic> newNoteData = {
+      'title': 'نسخة من ${_titleController.text}',
+      'content': _contentController.text,
+      'category': _selectedCategory,
+      'date': dateStr,
+      'time': timeStr,
+      'isFavorite': false,
+      'isArchived': false,
+      'isPinned': false,
+      'textColor': _titleColor.value,
+      'contentColor': _contentColor.value,
+      'fontFamily': _fontFamily,
+      'titleFontSize': _titleFontSize,
+      'contentFontSize': _contentFontSize,
+      'imagePaths': List<String>.from(_imagePaths),
+      'audioRecords': _audioRecords.map((e) => Map<String, String>.from(e)).toList(),
+    };
+
+    Hive.box('notes').add(newNoteData);
+    Navigator.pop(context); // إغلاق نافذة الإعدادات
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنشاء نسخة من الملاحظة')));
+  }
+
+  // إعداد التذكير
+  void _setReminder() async {
+    final TimeOfDay? time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Colors.white,
+              onPrimary: Colors.black,
+              surface: Color(0xFF161616),
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (time != null) {
+      final now = DateTime.now();
+      final scheduledDate = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+      
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate.add(const Duration(days: 1));
+      }
+
+      // إعداد الإشعار
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        _titleController.text.isEmpty ? 'تذكير بملاحظة' : _titleController.text,
+        _contentController.text.isEmpty ? 'لديك تذكير في هذا الوقت' : _contentController.text,
+        tz.TZDateTime.from(scheduledDate, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'reminder_channel',
+            'التذكيرات',
+            channelDescription: 'إشعارات التذكير بالملاحظات',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم ضبط التذكير في ${time.format(context)}')),
+      );
+    }
+  }
+
+  // البحث داخل النص وتحديده
+  void _searchInNote() {
+    TextEditingController searchController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF161616),
+        title: const Text('البحث داخل الملاحظة', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: searchController,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'أدخل الكلمة للبحث...', 
+            hintStyle: TextStyle(color: Colors.white30)
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء', style: TextStyle(color: Colors.white54))),
+          TextButton(
+            onPressed: () {
+              String query = searchController.text;
+              if (query.isNotEmpty) {
+                int startIndex = _contentController.text.indexOf(query);
+                if (startIndex != -1) {
+                  // تحديد النص مما يؤدي إلى التمرير التلقائي إليه
+                  _contentController.selection = TextSelection(
+                    baseOffset: startIndex,
+                    extentOffset: startIndex + query.length,
+                  );
+
+                  // إزالة التحديد بعد ثانية واحدة
+                  Future.delayed(const Duration(seconds: 1), () {
+                    if (mounted) {
+                      _contentController.selection = TextSelection.collapsed(
+                        offset: _contentController.selection.end,
+                      );
+                    }
+                  });
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على النص.')));
+                }
+              }
+              Navigator.pop(context);
+            }, 
+            child: const Text('بحث', style: TextStyle(color: Colors.white))
+          ),
+        ],
+      ),
+    );
   }
 
   void _pickColor() {
@@ -874,7 +1059,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
-  // === تصميم الحاسبة الجديد (مضغوط وفخم) ===
   void _showCalculatorDialog() {
     _calcDisplay = '0'; 
     showDialog(
@@ -884,14 +1068,13 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           builder: (context, setModalState) {
             return Dialog(
               backgroundColor: Colors.transparent,
-              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100), // إزالة المساحات الزائدة
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
               child: GlassContainer(
-                padding: const EdgeInsets.all(12), // تقليل الحشو
+                padding: const EdgeInsets.all(12),
                 borderRadius: 24,
                 child: Column(
-                  mainAxisSize: MainAxisSize.min, // ضغط المحتوى
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // الشريط العلوي
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -908,7 +1091,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                     ),
                     const SizedBox(height: 8),
                     
-                    // شاشة العرض
                     Container(
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -918,7 +1100,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                     ),
                     const SizedBox(height: 12),
                     
-                    // الأزرار (تصميم فخم)
                     GridView.count(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -980,7 +1161,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                     ),
                     const SizedBox(height: 12),
                     
-                    // زر الإدراج
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -1029,34 +1209,32 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 children: [
                   Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white30, borderRadius: BorderRadius.circular(10))),
                   const SizedBox(height: 20),
+                  
+                  // خيار التذكير
                   ListTile(
                     leading: const Icon(Icons.alarm, color: Colors.white),
                     title: const Text('تذكير', style: TextStyle(color: Colors.white)),
-                    onTap: () async {
-                      Navigator.pop(context);
-                      final TimeOfDay? time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-                      if (time != null) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم ضبط التذكير في ${time.format(context)}')));
-                      }
-                    },
+                    onTap: _setReminder,
                   ),
+                  
+                  // خيار البحث
                   ListTile(
                     leading: const Icon(Icons.search, color: Colors.white),
                     title: const Text('البحث عن نص داخل الملاحظة', style: TextStyle(color: Colors.white)),
                     onTap: () {
                       Navigator.pop(context);
-                      _showSearchDialog();
+                      _searchInNote();
                     },
                   ),
+                  
+                  // خيار إنشاء نسخة
                   ListTile(
                     leading: const Icon(Icons.copy, color: Colors.white),
-                    title: const Text('إنشاء نسخة', style: TextStyle(color: Colors.white)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Clipboard.setData(ClipboardData(text: _contentController.text));
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ النص إلى الحافظة')));
-                    },
+                    title: const Text('إنشاء نسخة من الملاحظة', style: TextStyle(color: Colors.white)),
+                    onTap: _duplicateNote,
                   ),
+                  
+                  // خيار الإرسال
                   ListTile(
                     leading: const Icon(Icons.share, color: Colors.white),
                     title: const Text('إرسال', style: TextStyle(color: Colors.white)),
@@ -1072,37 +1250,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ),
         );
       },
-    );
-  }
-
-  void _showSearchDialog() {
-    TextEditingController searchController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF161616),
-        title: const Text('البحث داخل الملاحظة', style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: searchController,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(hintText: 'أدخل النص للبحث...', hintStyle: TextStyle(color: Colors.white30)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء', style: TextStyle(color: Colors.white54))),
-          TextButton(
-            onPressed: () {
-              String query = searchController.text;
-              if (query.isNotEmpty && _contentController.text.contains(query)) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم العثور على النص!')));
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على النص.')));
-              }
-              Navigator.pop(context);
-            }, 
-            child: const Text('بحث', style: TextStyle(color: Colors.white))
-          ),
-        ],
-      ),
     );
   }
 
@@ -1254,6 +1401,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             const SizedBox(height: 10),
             TextField(
               controller: _contentController,
+              scrollController: _contentScrollController,
               maxLines: null,
               style: contentStyle,
               decoration: const InputDecoration(hintText: 'اكتب ملاحظتك هنا...', hintStyle: TextStyle(color: Colors.white30), border: InputBorder.none),
@@ -1324,7 +1472,7 @@ class GlassContainer extends StatelessWidget {
             border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 30, spreadRadius: 5)],
           ),
-          child: child, // إزالة Center لأننا نحتاج التحكم في الأحجام
+          child: child,
         ),
       ),
     );
