@@ -26,7 +26,7 @@ apply plugin: 'kotlin-android'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
-    namespace "com.example.my_notes" // <--- تم إضافة هذا السطر لحل المشكلة
+    namespace "com.example.my_notes"
     compileSdkVersion 34
     ndkVersion "26.1.10909125"
 
@@ -54,6 +54,8 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.debug
+            minifyEnabled false      // تعطيل تصغير الكود
+            shrinkResources false    // تعطيل حذف الموارد غير المستخدمة
         }
     }
 }
