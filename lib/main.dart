@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart'; // ضروري لـ DartPluginRegistrant
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -25,52 +26,70 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final MethodChannel _ringtoneChannel = const MethodChannel('com.example.my_notes/ringtone');
 
-// ==================== دالة معالجة الأزرار في الخلفية ====================
+// ==================== دالة معالجة الأزرار في الخلفية (مُصححة) ====================
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse notificationResponse) async {
-  // هذه الدالة تعمل في خلفية التطبيق (حتى لو كان مغلقاً)
+  // 1. تهيئة المكونات الإضافية في بيئة الخلفية
+  DartPluginRegistrant.ensureInitialized();
+  
+  // 2. تهيئة المنطقة الزمنية (لأنها لا تُنقل تلقائياً للخلفية)
+  tz.initializeTimeZones();
+  final String timeZoneName = await FlutterTimezone.getLocalTimezone();
+  tz.setLocalLocation(tz.getLocation(timeZoneName));
+
+  // 3. إعادة إنشاء نسخة من المكون الإضافي للإشعارات
+  final FlutterLocalNotificationsPlugin localPlugin = FlutterLocalNotificationsPlugin();
+
   if (notificationResponse.actionId == 'snooze_action') {
     // إعادة جدولة الإشعار بعد 5 دقائق
     final snoozeTime = DateTime.now().add(const Duration(minutes: 5));
     
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      notificationResponse.id ?? 0,
-      notificationResponse.payload ?? 'تذكير بملاحظة',
-      'لديك تذكير في هذا الوقت (غفوة)',
-      tz.TZDateTime.from(snoozeTime, tz.local),
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          'reminder_alarm_channel_v3',
-          'المنبهات المستمرة',
-          channelDescription: 'منبهات لا تتوقف حتى يتم إيقافها',
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          enableVibration: true,
-          category: AndroidNotificationCategory.alarm,
-          fullScreenIntent: true,
-          ongoing: true,
-          autoCancel: false,
-          additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT
-          actions: <AndroidNotificationAction>[
-            const AndroidNotificationAction(
-              'dismiss_action',
-              'إيقاف',
-              cancelNotification: true,
-              showsUserInterface: false,
-            ),
-            const AndroidNotificationAction(
-              'snooze_action',
-              'غفوة (5 دقائق)',
-              cancelNotification: true,
-              showsUserInterface: false,
-            ),
-          ],
+    try {
+      await localPlugin.zonedSchedule(
+        notificationResponse.id ?? 0,
+        notificationResponse.payload ?? 'تذكير بملاحظة',
+        'لديك تذكير في هذا الوقت (غفوة)',
+        tz.TZDateTime.from(snoozeTime, tz.local),
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'reminder_alarm_channel_v3',
+            'المنبهات المستمرة',
+            channelDescription: 'منبهات لا تتوقف حتى يتم إيقافها',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            category: AndroidNotificationCategory.alarm,
+            fullScreenIntent: true,
+            ongoing: true,
+            autoCancel: false,
+            additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT
+            // استخدام نغمة النظام الافتراضية للمنبه
+            sound: const RawResourceAndroidNotificationSound('default'),
+            actions: <AndroidNotificationAction>[
+              const AndroidNotificationAction(
+                'dismiss_action',
+                'إيقاف',
+                cancelNotification: true,
+                showsUserInterface: false,
+              ),
+              const AndroidNotificationAction(
+                'snooze_action',
+                'غفوة (5 دقائق)',
+                cancelNotification: true,
+                showsUserInterface: false,
+              ),
+            ],
+          ),
         ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-    );
+        payload: notificationResponse.payload,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      // يمكنك تسجيل الخطأ هنا إذا أردت
+      print("Error snoozing notification: $e");
+    }
   }
   // زر "إيقاف" سيتم إغلاق الإشعار تلقائياً بسبب cancelNotification: true
 }
