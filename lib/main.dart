@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data'; // ضروري لاستخدام Int32List
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -60,7 +61,7 @@ Future<void> _initNotifications() async {
     },
   );
 
-  // طلب إذن الإشعارات لأندرويد 13+
+  // طلب إذن الإشعارات والمنبهات
   final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
       flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
@@ -89,7 +90,6 @@ class MyNotesApp extends StatelessWidget {
           iconTheme: IconThemeData(color: Colors.white),
           centerTitle: true,
         ),
-        // تخصيص لون تحديد النص ليكون أبيض
         textSelectionTheme: TextSelectionThemeData(
           cursorColor: Colors.white,
           selectionColor: Colors.white.withOpacity(0.4),
@@ -627,7 +627,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     super.dispose();
   }
 
-  // حفظ الملاحظة
   void _saveNote() async {
     if (_titleController.text.isNotEmpty || _contentController.text.isNotEmpty) {
       final now = DateTime.now();
@@ -661,7 +660,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
-  // إنشاء نسخة من الملاحظة
   void _duplicateNote() {
     final now = DateTime.now();
     final dateStr = DateFormat('yyyy/MM/dd').format(now);
@@ -686,11 +684,11 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     };
 
     Hive.box('notes').add(newNoteData);
-    Navigator.pop(context); // إغلاق نافذة الإعدادات
+    Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنشاء نسخة من الملاحظة')));
   }
 
-  // إعداد التذكير مع طلب إذن المنبهات
+  // دالة التذكير المعدلة (منبه مستمر)
   void _setReminder() async {
     final TimeOfDay? time = await showTimePicker(
       context: context,
@@ -711,7 +709,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     );
 
     if (time != null) {
-      // التحقق من إذن المنبهات الدقيقة (مطلوب لأندرويد 12+)
       final androidPlugin = flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       
@@ -730,6 +727,9 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         }
       }
 
+      // طلب إذن الشاشة الكاملة (Full Screen Intent) لأندرويد 14+
+      await androidPlugin?.requestFullScreenIntentPermission();
+
       final now = DateTime.now();
       final scheduledDate = DateTime(now.year, now.month, now.day, time.hour, time.minute);
       
@@ -737,6 +737,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ? scheduledDate.add(const Duration(days: 1)) 
           : scheduledDate;
 
+      // إعداد المنبه المستمر
       await flutterLocalNotificationsPlugin.zonedSchedule(
         DateTime.now().millisecondsSinceEpoch.remainder(100000),
         _titleController.text.isEmpty ? 'تذكير بملاحظة' : _titleController.text,
@@ -744,12 +745,18 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         tz.TZDateTime.from(finalDate, tz.local),
         const NotificationDetails(
           android: AndroidNotificationDetails(
-            'reminder_channel',
-            'التذكيرات',
-            channelDescription: 'إشعارات التذكير بالملاحظات',
+            'reminder_alarm_channel_v1', // معرف قناة جديد للمنبهات المستمرة
+            'المنبهات المستمرة',
+            channelDescription: 'منبهات لا تتوقف حتى يتم إيقافها',
             importance: Importance.max,
             priority: Priority.high,
             playSound: true,
+            enableVibration: true,
+            category: AndroidNotificationCategory.alarm, // تصنيف كمنبه
+            fullScreenIntent: true, // إظهار على شاشة القفل
+            ongoing: true, // منع الإغلاق التلقائي
+            autoCancel: false, // لا يختفي عند الضغط
+            additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT = 4 (الرنين المستمر)
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -759,13 +766,12 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تم ضبط التذكير في ${time.format(context)}')),
+          SnackBar(content: Text('تم ضبط المنبه في ${time.format(context)}')),
         );
       }
     }
   }
 
-  // البحث داخل النص وتحديده
   void _searchInNote() {
     TextEditingController searchController = TextEditingController();
     showDialog(
@@ -789,13 +795,10 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
               if (query.isNotEmpty) {
                 int startIndex = _contentController.text.indexOf(query);
                 if (startIndex != -1) {
-                  // تحديد النص مما يؤدي إلى التمرير التلقائي إليه
                   _contentController.selection = TextSelection(
                     baseOffset: startIndex,
                     extentOffset: startIndex + query.length,
                   );
-
-                  // إزالة التحديد بعد ثانية واحدة
                   Future.delayed(const Duration(seconds: 1), () {
                     if (mounted) {
                       _contentController.selection = TextSelection.collapsed(
@@ -1230,14 +1233,12 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                   Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white30, borderRadius: BorderRadius.circular(10))),
                   const SizedBox(height: 20),
                   
-                  // خيار التذكير
                   ListTile(
                     leading: const Icon(Icons.alarm, color: Colors.white),
                     title: const Text('تذكير', style: TextStyle(color: Colors.white)),
                     onTap: _setReminder,
                   ),
                   
-                  // خيار البحث
                   ListTile(
                     leading: const Icon(Icons.search, color: Colors.white),
                     title: const Text('البحث عن نص داخل الملاحظة', style: TextStyle(color: Colors.white)),
@@ -1247,14 +1248,12 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                     },
                   ),
                   
-                  // خيار إنشاء نسخة
                   ListTile(
                     leading: const Icon(Icons.copy, color: Colors.white),
                     title: const Text('إنشاء نسخة من الملاحظة', style: TextStyle(color: Colors.white)),
                     onTap: _duplicateNote,
                   ),
                   
-                  // خيار الإرسال
                   ListTile(
                     leading: const Icon(Icons.share, color: Colors.white),
                     title: const Text('إرسال', style: TextStyle(color: Colors.white)),
