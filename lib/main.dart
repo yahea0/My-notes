@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:math_expressions/math_expressions.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +35,7 @@ class MyNotesApp extends StatelessWidget {
           centerTitle: true,
         ),
       ),
-      // إجبار التطبيق على الاتجاه العربي من اليمين لليسار
+      // إجبار التطبيق على الاتجاه العربي
       builder: (context, child) {
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -201,7 +200,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNoteCard(Map note, dynamic noteKey, Box box) {
     return InkWell(
       onTap: () {
-        // فتح الملاحظة للتعديل
         Navigator.push(context, MaterialPageRoute(builder: (context) => AddNoteScreen(note: note, noteKey: noteKey)));
       },
       borderRadius: BorderRadius.circular(16),
@@ -265,31 +263,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // نافذة تأكيد الحذف الأنيقة
   void _showDeleteConfirmation(BuildContext context, Box box, dynamic noteKey) {
     showDialog(
       context: context,
-      builder: (context) => BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-        child: AlertDialog(
-          backgroundColor: const Color(0xFF161616),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.white12)),
-          title: const Text('تأكيد الحذف', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          content: const Text('هل أنت متأكد من حذف هذه الملاحظة؟', style: TextStyle(color: Colors.white70)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
-            ),
-            TextButton(
-              onPressed: () {
-                box.delete(noteKey);
-                Navigator.pop(context);
-              },
-              child: const Text('تأكيد الحذف', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF161616),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.white12)),
+        title: const Text('تأكيد الحذف', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text('هل أنت متأكد من حذف هذه الملاحظة؟', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () {
+              box.delete(noteKey);
+              Navigator.pop(context);
+            },
+            child: const Text('تأكيد الحذف', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -313,7 +307,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   
   bool _isCalcOpen = false;
   String _calcDisplay = '0';
-  String _calcExpression = '';
 
   @override
   void initState() {
@@ -330,7 +323,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       final timeStr = DateFormat('hh:mm a').format(now);
 
       if (widget.note == null) {
-        // إضافة جديدة
         Hive.box('notes').add({
           'title': _titleController.text,
           'content': _contentController.text,
@@ -339,12 +331,11 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           'time': timeStr,
         });
       } else {
-        // تعديل موجودة
         Hive.box('notes').put(widget.noteKey, {
           'title': _titleController.text,
           'content': _contentController.text,
           'category': _selectedCategory,
-          'date': widget.note!['date'], // نحتفظ بتاريخ الإنشاء
+          'date': widget.note!['date'], 
           'time': widget.note!['time'],
         });
       }
@@ -352,12 +343,10 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
-  // الحاسبة الحقيقية
   void _onCalcButtonPressed(String value) {
     setState(() {
       if (value == 'C') {
         _calcDisplay = '0';
-        _calcExpression = '';
       } else if (value == '⌫') {
         if (_calcDisplay.isNotEmpty && _calcDisplay != '0') {
           _calcDisplay = _calcDisplay.substring(0, _calcDisplay.length - 1);
@@ -365,7 +354,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         }
       } else if (value == '=') {
         try {
-          // استخدام مكتبة math_expressions لحساب النتيجة
           String exp = _calcDisplay.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
           Parser p = Parser();
           Expression expParsed = p.parse(exp);
@@ -386,20 +374,30 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     });
   }
 
-  // إدراج النتيجة في النص
   void _insertResult() {
     if (_calcDisplay != 'خطأ') {
-      _contentController.insertText(_calcDisplay);
+      // طريقة صحيحة لإدراج النص في مكان المؤشر
+      final text = _contentController.text;
+      final selection = _contentController.selection;
+      
+      if (selection.start == -1) {
+        _contentController.text = text + _calcDisplay;
+      } else {
+        final newText = text.replaceRange(selection.start, selection.end, _calcDisplay);
+        _contentController.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection.collapsed(offset: selection.start + _calcDisplay.length),
+        );
+      }
+      
       setState(() => _isCalcOpen = false);
     }
   }
 
-  // اختيار صورة من المعرض
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
-      // سيتم إضافة منطق حفظ الصورة هنا في التحديث القادم
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم اختيار الصورة (سيتم تفعيل الحفظ قريباً)')));
     }
   }
@@ -465,7 +463,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             ),
           ),
           
-          // الحاسبة العائمة
           if (_isCalcOpen)
             Positioned(
               bottom: 80, left: 20, right: 20,
@@ -494,7 +491,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                       }).toList(),
                     ),
                     const SizedBox(height: 12),
-                    // زر إدراج النتيجة
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -534,7 +530,7 @@ class GlassContainer extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
         child: Container(
           height: height, width: width, padding: padding,
           decoration: BoxDecoration(
