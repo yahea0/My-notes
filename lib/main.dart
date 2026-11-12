@@ -1,15 +1,11 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // تهيئة Hive بطريقة آمنة لوضع الإصدار
   final appDocumentDir = await getApplicationDocumentsDirectory();
   Hive.init(appDocumentDir.path);
-
   runApp(const MyNotesApp());
 }
 
@@ -23,14 +19,21 @@ class MyNotesApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF030303),
+        scaffoldBackgroundColor: const Color(0xFF0A0A0A), // أسود مطفي فخم
+        primaryColor: Colors.white,
         fontFamily: 'Tahoma',
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF0A0A0A),
+          elevation: 0,
+          iconTheme: IconThemeData(color: Colors.white),
+        ),
       ),
       home: const HomeScreen(),
     );
   }
 }
 
+// ==================== الشاشة الرئيسية ====================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
@@ -39,233 +42,298 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _isCalcOpen = false;
+  late Box notesBox;
+  String selectedCategory = 'الكل';
+
+  @override
+  void initState() {
+    super.initState();
+    notesBox = Hive.box('notes'); // فتح صندوق الملاحظات
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
+      appBar: AppBar(
+        title: const Text('ملاحظاتي', style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () {}, // سيتم تفعيلها لاحقاً للقائمة الجانبية
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // خلفية متدرجة فاخرة
-          Container(
-            decoration: const BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment(0, -1),
-                radius: 1.5,
-                colors: [Color(0xFF1A1A1A), Color(0xFF030303)],
-              ),
+          // شريط التصنيفات
+          SizedBox(
+            height: 50,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _buildCategoryChip('الكل', Icons.apps),
+                _buildCategoryChip('العمل', Icons.work_outline),
+                _buildCategoryChip('الدراسة', Icons.school_outlined),
+                _buildCategoryChip('شخصي', Icons.person_outline),
+              ],
             ),
           ),
           
-          // المحتوى الرئيسي
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10),
-              child: Column(
-                children: [
-                  // الترويسة
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'ملاحظاتي',
-                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                      _buildGlassButton(Icons.add, () {}),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // شريط البحث
-                  GlassContainer(
-                    height: 54,
-                    width: double.infinity,
-                    child: Row(
-                      children: const [
-                        SizedBox(width: 16),
-                        Icon(Icons.search, color: Colors.white54, size: 20),
-                        SizedBox(width: 12),
-                        Text('ابحث في ملاحظاتك...', style: TextStyle(color: Colors.white54, fontSize: 15)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+          // قائمة الملاحظات
+          Expanded(
+            child: ValueListenableBuilder(
+              valueListenable: notesBox.listenable(),
+              builder: (context, Box box, _) {
+                // تصفية الملاحظات حسب التصنيف
+                final filteredNotes = box.values.where((note) {
+                  if (selectedCategory == 'الكل') return true;
+                  return note['category'] == selectedCategory;
+                }).toList();
 
-                  // قائمة الملاحظات (تجريبية حالياً)
-                  Expanded(
-                    child: ListView(
-                      children: [
-                        _buildNoteCard('خطة المشروع', 'مراجعة التصميم النهائي وإرسال النسخة للعميل. يجب التركيز على الألوان الداكنة والزجاجية.'),
-                        _buildNoteCard('أفكار تصميم', 'استخدام تدرجات سوداء مطفية مع حدود فضية رقيقة. الأزرار تعطي إحساس بالبروز واللمعان.'),
-                        _buildNoteCard('تسجيل اجتماع', '🎙 مقطع صوتي · 2:14 دقيقة'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                if (filteredNotes.isEmpty) {
+                  return const Center(
+                    child: Text('لا توجد ملاحظات هنا...', style: TextStyle(color: Colors.white54, fontSize: 16)),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  itemCount: filteredNotes.length,
+                  itemBuilder: (context, index) {
+                    final note = filteredNotes[index];
+                    return _buildNoteCard(note, box.keyAt(box.values.toList().indexOf(note)));
+                  },
+                );
+              },
             ),
           ),
-
-          // شريط الأدوات السفلي
-          Positioned(
-            bottom: 24, left: 24, right: 24,
-            child: GlassContainer(
-              height: 76,
-              borderRadius: 26,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildToolIcon(Icons.mic_none),
-                  _buildToolIcon(Icons.image_outlined),
-                  _buildToolIcon(Icons.videocam_outlined),
-                  _buildToolIcon(Icons.text_fields),
-                  _buildToolIcon(Icons.color_lens_outlined),
-                  _buildToolIcon(Icons.calculate_outlined, isActive: _isCalcOpen, onTap: () {
-                    setState(() { _isCalcOpen = !_isCalcOpen; });
-                  }),
-                ],
-              ),
-            ),
-          ),
-
-          // النافذة العائمة للحاسبة
-          if (_isCalcOpen)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () => setState(() => _isCalcOpen = false),
-                child: Container(
-                  color: Colors.black.withOpacity(0.6),
-                  child: Center(
-                    child: GestureDetector(
-                      onTap: () {}, // لمنع إغلاق النافذة عند الضغط عليها
-                      child: _buildCalculator(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+        ],
+      ),
+      // زر الإضافة العائم
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddNoteScreen()),
+          );
+        },
+        backgroundColor: Colors.white,
+        child: const Icon(Icons.add, color: Colors.black, size: 30),
+      ),
+      // شريط التنقل السفلي
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color(0xFF121212),
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white38,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
+          BottomNavigationBarItem(icon: Icon(Icons.archive_outlined), label: 'الأرشيف'),
+          BottomNavigationBarItem(icon: Icon(Icons.star_border), label: 'المفضلة'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'الإعدادات'),
         ],
       ),
     );
   }
 
-  Widget _buildGlassButton(IconData icon, VoidCallback onTap) {
+  Widget _buildCategoryChip(String title, IconData icon) {
+    bool isSelected = selectedCategory == title;
     return GestureDetector(
-      onTap: onTap,
-      child: GlassContainer(
-        height: 46, width: 46, borderRadius: 16,
-        child: Icon(icon, color: Colors.white, size: 22),
-      ),
-    );
-  }
-
-  Widget _buildToolIcon(IconData icon, {bool isActive = false, VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        setState(() {
+          selectedCategory = title;
+        });
+      },
       child: Container(
-        height: 48, width: 48,
+        margin: const EdgeInsets.only(left: 12, top: 8, bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? Colors.white.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isActive ? Colors.white.withOpacity(0.2) : Colors.transparent),
+          color: isSelected ? Colors.white : const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: Icon(icon, color: isActive ? Colors.white : Colors.white70, size: 22),
-      ),
-    );
-  }
-
-  Widget _buildNoteCard(String title, String content) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: GlassContainer(
-        padding: const EdgeInsets.all(20),
-        borderRadius: 22,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white)),
-            const SizedBox(height: 8),
-            Text(content, style: const TextStyle(fontSize: 13.5, color: Colors.white54, height: 1.6)),
+            Icon(icon, color: isSelected ? Colors.black : Colors.white70, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white70,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCalculator() {
-    return GlassContainer(
-      width: 320, height: 480, borderRadius: 32, padding: const EdgeInsets.all(24),
+  Widget _buildNoteCard(Map note, int index) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161616), // رمادي داكن جداً
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // شاشة الحاسبة
-          Container(
-            height: 80, alignment: Alignment.bottomLeft,
-            child: const Text('1,250', style: TextStyle(fontSize: 42, fontWeight: FontWeight.w300, color: Colors.white)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                note['title'] ?? 'بدون عنوان',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                onPressed: () {
+                  Hive.box('notes').deleteAt(index); // حذف الملاحظة
+                },
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          // الأزرار
-          Expanded(
-            child: GridView.count(
-              crossAxisCount: 4, mainAxisSpacing: 12, crossAxisSpacing: 12,
-              children: ['C', '⌫', '%', '÷', '7', '8', '9', '×', '4', '5', '6', '−', '1', '2', '3', '+', '0', '.', '='].map((e) {
-                bool isEq = e == '=';
-                return Container(
-                  decoration: BoxDecoration(
-                    color: isEq ? Colors.white : Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
-                    boxShadow: isEq ? [const BoxShadow(color: Colors.white24, blurRadius: 15)] : [],
-                  ),
-                  child: Center(
-                    child: Text(e, style: TextStyle(
-                      fontSize: 22, 
-                      color: isEq ? Colors.black : Colors.white, 
-                      fontWeight: isEq ? FontWeight.bold : FontWeight.normal
-                    )),
-                  ),
-                );
-              }).toList(),
-            ),
-          )
+          const SizedBox(height: 8),
+          Text(
+            note['content'] ?? '',
+            style: const TextStyle(fontSize: 14, color: Colors.white54, height: 1.5),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                note['category'] ?? 'عام',
+                style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
+              ),
+              Text(
+                note['date'] ?? '',
+                style: const TextStyle(fontSize: 12, color: Colors.white38),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-// ويدجت مخصص لصنع التأثير الزجاجي الفاخر (Glassmorphism)
-class GlassContainer extends StatelessWidget {
-  final Widget child;
-  final double? height;
-  final double? width;
-  final double borderRadius;
-  final EdgeInsetsGeometry? padding;
+// ==================== شاشة إضافة ملاحظة ====================
+class AddNoteScreen extends StatefulWidget {
+  const AddNoteScreen({Key? key}) : super(key: key);
 
-  const GlassContainer({
-    Key? key, required this.child, this.height, this.width, this.borderRadius = 18, this.padding,
-  }) : super(key: key);
+  @override
+  State<AddNoteScreen> createState() => _AddNoteScreenState();
+}
+
+class _AddNoteScreenState extends State<AddNoteScreen> {
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _contentController = TextEditingController();
+  String _selectedCategory = 'عام';
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-        child: Container(
-          height: height, width: width, padding: padding,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.02)],
-            ),
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 30, spreadRadius: 5),
-              BoxShadow(color: Colors.white.withOpacity(0.2), offset: const Offset(0, 1), blurRadius: 1),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('ملاحظة جديدة'),
+        actions: [
+          // زر الحفظ
+          IconButton(
+            icon: const Icon(Icons.check, color: Colors.white),
+            onPressed: () {
+              if (_titleController.text.isNotEmpty || _contentController.text.isNotEmpty) {
+                final notesBox = Hive.box('notes');
+                notesBox.add({
+                  'title': _titleController.text,
+                  'content': _contentController.text,
+                  'category': _selectedCategory,
+                  'date': '2026/11/12', // يمكن جلب التاريخ الحقيقي لاحقاً
+                });
+                Navigator.pop(context); // العودة للشاشة الرئيسية
+              }
+            },
           ),
-          child: Center(child: child),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // حقل العنوان
+            TextField(
+              controller: _titleController,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'عنوان الملاحظة...',
+                hintStyle: TextStyle(color: Colors.white30),
+                border: InputBorder.none,
+              ),
+            ),
+            const Divider(color: Colors.white12),
+            // حقل المحتوى
+            Expanded(
+              child: TextField(
+                controller: _contentController,
+                maxLines: null,
+                style: const TextStyle(fontSize: 16, color: Colors.white70, height: 1.6),
+                decoration: const InputDecoration(
+                  hintText: 'اكتب ملاحظتك هنا...',
+                  hintStyle: TextStyle(color: Colors.white30),
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+            // شريط الأدوات السفلي (أزرار الصور والصوت وغيرها)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Colors.white12)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(icon: const Icon(Icons.image_outlined, color: Colors.white70), onPressed: () {}),
+                  IconButton(icon: const Icon(Icons.camera_alt_outlined, color: Colors.white70), onPressed: () {}),
+                  IconButton(icon: const Icon(Icons.mic_none, color: Colors.white70), onPressed: () {}),
+                  IconButton(icon: const Icon(Icons.color_lens_outlined, color: Colors.white70), onPressed: () {}),
+                  // قائمة اختيار التصنيف
+                  DropdownButton<String>(
+                    value: _selectedCategory,
+                    dropdownColor: const Color(0xFF1E1E1E),
+                    underline: Container(),
+                    icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                    style: const TextStyle(color: Colors.white),
+                    items: ['عام', 'العمل', 'الدراسة', 'شخصي'].map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      setState(() {
+                        _selectedCategory = newValue!;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
