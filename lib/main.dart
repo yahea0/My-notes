@@ -11,6 +11,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:photo_view/photo_view.dart'; // مكتبة عرض الصور
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -132,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : Text(_getTitleByIndex(_currentIndex), style: const TextStyle(fontWeight: FontWeight.bold)),
         actions: [
-          if (_currentIndex != 3) // إخفاء البحث في الإعدادات
+          if (_currentIndex != 3)
             IconButton(
               icon: Icon(_isSearching ? Icons.close : Icons.search), 
               onPressed: () {
@@ -146,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: _currentIndex == 3 
-          ? _buildSettingsScreen() // شاشة الإعدادات الحقيقية
+          ? _buildSettingsScreen()
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -171,7 +172,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       final Map<dynamic, dynamic> rawNotes = box.toMap();
                       final List<MapEntry<dynamic, dynamic>> allNotes = rawNotes.entries.toList();
 
-                      // فلترة
                       final filteredNotes = allNotes.where((entry) {
                         final note = entry.value;
                         final title = note['title'] ?? '';
@@ -190,7 +190,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         return matchesSearch && matchesTab && matchesCategory;
                       }).toList();
 
-                      // ترتيب الملاحظات: المثبتة أولاً
                       filteredNotes.sort((a, b) {
                         bool aPinned = a.value['isPinned'] ?? false;
                         bool bPinned = b.value['isPinned'] ?? false;
@@ -251,7 +250,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // شاشة الإعدادات
   Widget _buildSettingsScreen() {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -374,12 +372,19 @@ class _HomeScreenState extends State<HomeScreen> {
     double fontSize = note['fontSize'] ?? 18.0;
     String? imagePath = note['imagePath'];
     String? audioPath = note['audioPath'];
+    String? audioName = note['audioName']; // اسم التسجيل
 
-    // تحديد الخط
     TextStyle titleStyle = TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: textColor);
     if (fontFam == 'Cairo') titleStyle = GoogleFonts.cairo(textStyle: titleStyle);
     if (fontFam == 'Amiri') titleStyle = GoogleFonts.amiri(textStyle: titleStyle);
     if (fontFam == 'Tajawal') titleStyle = GoogleFonts.tajawal(textStyle: titleStyle);
+    if (fontFam == 'Almarai') titleStyle = GoogleFonts.almarai(textStyle: titleStyle);
+    if (fontFam == 'Noto Naskh Arabic') titleStyle = GoogleFonts.notoNaskhArabic(textStyle: titleStyle);
+    if (fontFam == 'Reem Kufi') titleStyle = GoogleFonts.reemKufi(textStyle: titleStyle);
+    if (fontFam == 'El Messiri') titleStyle = GoogleFonts.elMessiri(textStyle: titleStyle);
+    if (fontFam == 'Markazi Text') titleStyle = GoogleFonts.markaziText(textStyle: titleStyle);
+    if (fontFam == 'Changa') titleStyle = GoogleFonts.changa(textStyle: titleStyle);
+    if (fontFam == 'Mada') titleStyle = GoogleFonts.mada(textStyle: titleStyle);
 
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNoteScreen(note: note, noteKey: noteKey))),
@@ -390,7 +395,7 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFF161616),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isPinned ? Colors.white54 : Colors.white10), // حدود مضيئة للمثبت
+          border: Border.all(color: isPinned ? Colors.white54 : Colors.white10),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,11 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(child: Text(note['title'] ?? 'بدون عنوان', style: titleStyle)),
                 Row(
                   children: [
-                    IconButton(icon: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined, color: isPinned ? Colors.white : Colors.white38, size: 20), onPressed: () {
-                      Map updatedNote = Map.from(note);
-                      updatedNote['isPinned'] = !isPinned;
-                      box.put(noteKey, updatedNote);
-                    }),
+                    // إزالة زر التثبيت من الخارج بناءً على طلبك
                     IconButton(icon: Icon(isFav ? Icons.star : Icons.star_border, color: isFav ? Colors.amber : Colors.white38, size: 22), onPressed: () {
                       Map updatedNote = Map.from(note);
                       updatedNote['isFavorite'] = !isFav;
@@ -434,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     const Icon(Icons.audiotrack, color: Colors.blueAccent, size: 16),
                     const SizedBox(width: 4),
-                    const Text('ملف صوتي مرفق', style: TextStyle(color: Colors.blueAccent, fontSize: 12)),
+                    Text(audioName ?? 'ملف صوتي مرفق', style: const TextStyle(color: Colors.blueAccent, fontSize: 12)),
                   ],
                 ),
               ),
@@ -498,14 +499,18 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   late TextEditingController _contentController;
   String _selectedCategory = 'عام';
   
-  // الألوان والخطوط
-  Color _currentTextColor = Colors.white;
-  String _currentFontFamily = 'Tahoma';
-  double _currentFontSize = 22.0;
+  // التنسيق
+  Color _titleColor = Colors.white;
+  Color _contentColor = Colors.white;
+  String _fontFamily = 'Tahoma';
+  double _titleFontSize = 22.0;
+  double _contentFontSize = 16.0;
+  bool _styleForTitle = true; // true للعنوان، false للنص
 
   // الوسائط
   String? _imagePath;
   String? _audioPath;
+  String? _audioName;
 
   // الحاسبة
   bool _isCalcOpen = false;
@@ -515,6 +520,9 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   bool _isRecording = false;
 
+  // التثبيت
+  bool _isPinned = false;
+
   @override
   void initState() {
     super.initState();
@@ -523,11 +531,15 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     _selectedCategory = widget.note != null ? widget.note!['category'] : 'عام';
     
     if (widget.note != null) {
-      _currentTextColor = widget.note!['textColor'] != null ? Color(widget.note!['textColor']) : Colors.white;
-      _currentFontFamily = widget.note!['fontFamily'] ?? 'Tahoma';
-      _currentFontSize = widget.note!['fontSize'] ?? 22.0;
+      _titleColor = widget.note!['textColor'] != null ? Color(widget.note!['textColor']) : Colors.white;
+      _contentColor = widget.note!['contentColor'] != null ? Color(widget.note!['contentColor']) : Colors.white;
+      _fontFamily = widget.note!['fontFamily'] ?? 'Tahoma';
+      _titleFontSize = widget.note!['titleFontSize'] ?? 22.0;
+      _contentFontSize = widget.note!['contentFontSize'] ?? 16.0;
       _imagePath = widget.note!['imagePath'];
       _audioPath = widget.note!['audioPath'];
+      _audioName = widget.note!['audioName'];
+      _isPinned = widget.note!['isPinned'] ?? false;
     }
   }
 
@@ -545,12 +557,15 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         'time': widget.note != null ? widget.note!['time'] : timeStr,
         'isFavorite': widget.note != null ? widget.note!['isFavorite'] ?? false : false,
         'isArchived': widget.note != null ? widget.note!['isArchived'] ?? false : false,
-        'isPinned': widget.note != null ? widget.note!['isPinned'] ?? false : false,
-        'textColor': _currentTextColor.value,
-        'fontFamily': _currentFontFamily,
-        'fontSize': _currentFontSize,
+        'isPinned': _isPinned,
+        'textColor': _titleColor.value,
+        'contentColor': _contentColor.value,
+        'fontFamily': _fontFamily,
+        'titleFontSize': _titleFontSize,
+        'contentFontSize': _contentFontSize,
         'imagePath': _imagePath,
         'audioPath': _audioPath,
+        'audioName': _audioName,
       };
 
       if (widget.note == null) {
@@ -564,15 +579,20 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
 
   // اختيار لون
   void _pickColor() {
+    Color currentColor = _styleForTitle ? _titleColor : _contentColor;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF161616),
-        title: const Text('اختر لون النص', style: TextStyle(color: Colors.white)),
+        title: Text(_styleForTitle ? 'اختر لون العنوان' : 'اختر لون النص', style: const TextStyle(color: Colors.white)),
         content: SingleChildScrollView(
           child: ColorPicker(
-            pickerColor: _currentTextColor,
-            onColorChanged: (color) => setState(() => _currentTextColor = color),
+            pickerColor: currentColor,
+            onColorChanged: (color) {
+              setState(() {
+                if (_styleForTitle) { _titleColor = color; } else { _contentColor = color; }
+              });
+            },
             pickerAreaHeightPercent: 0.7,
             enableAlpha: false,
             displayThumbColor: true,
@@ -588,55 +608,108 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
 
   // اختيار الخط
   void _pickFont() {
+    // قائمة بأشهر الخطوط العربية
+    final List<Map<String, String>> fonts = [
+      {'id': 'Tahoma', 'name': 'افتراضي'},
+      {'id': 'Cairo', 'name': 'القاهرة'},
+      {'id': 'Tajawal', 'name': 'تجوال'},
+      {'id': 'Amiri', 'name': 'أميري'},
+      {'id': 'Almarai', 'name': 'المراعي'},
+      {'id': 'Noto Naskh Arabic', 'name': 'نوتو نسخ'},
+      {'id': 'Reem Kufi', 'name': 'ريم كوفي'},
+      {'id': 'El Messiri', 'name': 'المسيري'},
+      {'id': 'Markazi Text', 'name': 'مركزي'},
+      {'id': 'Changa', 'name': 'تشانغا'},
+    ];
+
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF161616),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('اختر الخط وحجمه', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        return StatefulBuilder( // استخدام StatefulBuilder لتحديث الشريط فوراً
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildFontChip('Tahoma', 'افتراضي'),
-                  _buildFontChip('Cairo', 'القاهرة'),
-                  _buildFontChip('Amiri', 'أميري'),
-                  _buildFontChip('Tajawal', 'تجوال'),
+                  const Text('اختر الخط وحجمه', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  
+                  // خيار: هل التغيير للعنوان أم النص؟
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('العنوان'),
+                        selected: _styleForTitle,
+                        onSelected: (val) => setModalState(() => _styleForTitle = true),
+                        selectedColor: Colors.white,
+                        labelStyle: TextStyle(color: _styleForTitle ? Colors.black : Colors.white),
+                      ),
+                      const SizedBox(width: 10),
+                      ChoiceChip(
+                        label: const Text('النص'),
+                        selected: !_styleForTitle,
+                        onSelected: (val) => setModalState(() => _styleForTitle = false),
+                        selectedColor: Colors.white,
+                        labelStyle: TextStyle(color: !_styleForTitle ? Colors.black : Colors.white),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // قائمة الخطوط
+                  SizedBox(
+                    height: 100,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: fonts.length,
+                      itemBuilder: (context, index) {
+                        final f = fonts[index];
+                        bool isSelected = _fontFamily == f['id'];
+                        return GestureDetector(
+                          onTap: () {
+                            setModalState(() => _fontFamily = f['id']!);
+                            setState(() {}); // تحديث الشاشة الرئيسية أيضاً
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.white : Colors.white12,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(f['name']!, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontFamily: f['id'] == 'Tahoma' ? null : f['id'])),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  Text('حجم الخط (${_styleForTitle ? _titleFontSize.toInt() : _contentFontSize.toInt()})', style: const TextStyle(color: Colors.white)),
+                  
+                  // شريط التمرير
+                  Slider(
+                    value: _styleForTitle ? _titleFontSize : _contentFontSize,
+                    min: 12,
+                    max: 40,
+                    activeColor: Colors.white,
+                    onChanged: (val) {
+                      setModalState(() {
+                        if (_styleForTitle) { _titleFontSize = val; } else { _contentFontSize = val; }
+                      });
+                      setState(() {}); // تحديث الشاشة الرئيسية
+                    },
+                  ),
                 ],
               ),
-              const SizedBox(height: 20),
-              const Text('حجم الخط', style: TextStyle(color: Colors.white)),
-              Slider(
-                value: _currentFontSize,
-                min: 16,
-                max: 40,
-                activeColor: Colors.white,
-                onChanged: (val) => setState(() => _currentFontSize = val),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
-    );
-  }
-
-  Widget _buildFontChip(String fontName, String label) {
-    bool isSelected = _currentFontFamily == fontName;
-    return GestureDetector(
-      onTap: () => setState(() => _currentFontFamily = fontName),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.white12,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(label, style: TextStyle(color: isSelected ? Colors.black : Colors.white)),
-      ),
     );
   }
 
@@ -649,6 +722,33 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
+  // عرض الصورة بالحجم الكامل
+  void _viewFullImage() {
+    if (_imagePath == null) return;
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            PhotoView(
+              imageProvider: FileImage(File(_imagePath!)),
+              backgroundDecoration: const BoxDecoration(color: Colors.black),
+            ),
+            Positioned(
+              top: 40, right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // تسجيل صوت
   Future<void> _toggleRecording() async {
     if (_isRecording) {
@@ -656,6 +756,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       setState(() {
         _isRecording = false;
         _audioPath = path;
+        _audioName = 'تسجيل جديد'; // اسم افتراضي
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الصوت')));
     } else {
@@ -676,12 +777,38 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     }
   }
 
+  // تغيير اسم التسجيل
+  void _renameAudio() {
+    TextEditingController _controller = TextEditingController(text: _audioName);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF161616),
+        title: const Text('اسم التسجيل', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: _controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(hintText: 'أدخل اسماً...', hintStyle: TextStyle(color: Colors.white30)),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء', style: TextStyle(color: Colors.white54))),
+          TextButton(
+            onPressed: () {
+              setState(() => _audioName = _controller.text);
+              Navigator.pop(context);
+            }, 
+            child: const Text('حفظ', style: TextStyle(color: Colors.white))
+          ),
+        ],
+      ),
+    );
+  }
+
   // الحاسبة
   void _onCalcButtonPressed(String value) {
     setState(() {
-      if (value == 'C') {
-        _calcDisplay = '0';
-      } else if (value == '⌫') {
+      if (value == 'C') { _calcDisplay = '0'; } 
+      else if (value == '⌫') {
         if (_calcDisplay.isNotEmpty && _calcDisplay != '0') {
           _calcDisplay = _calcDisplay.substring(0, _calcDisplay.length - 1);
           if (_calcDisplay.isEmpty) _calcDisplay = '0';
@@ -694,9 +821,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ContextModel cm = ContextModel();
           double eval = expParsed.evaluate(EvaluationType.REAL, cm);
           _calcDisplay = eval.toStringAsFixed(eval.truncateToDouble() == eval ? 0 : 2);
-        } catch (e) {
-          _calcDisplay = 'خطأ';
-        }
+        } catch (e) { _calcDisplay = 'خطأ'; }
       } else {
         if (_calcDisplay == '0' && value != '.') { _calcDisplay = value; } 
         else { _calcDisplay += value; }
@@ -720,22 +845,38 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    TextStyle titleStyle = TextStyle(fontSize: _currentFontSize, fontWeight: FontWeight.bold, color: _currentTextColor);
-    if (_currentFontFamily == 'Cairo') titleStyle = GoogleFonts.cairo(textStyle: titleStyle);
-    if (_currentFontFamily == 'Amiri') titleStyle = GoogleFonts.amiri(textStyle: titleStyle);
-    if (_currentFontFamily == 'Tajawal') titleStyle = GoogleFonts.tajawal(textStyle: titleStyle);
+    TextStyle titleStyle = TextStyle(fontSize: _titleFontSize, fontWeight: FontWeight.bold, color: _titleColor);
+    TextStyle contentStyle = TextStyle(fontSize: _contentFontSize, color: _contentColor.withOpacity(0.8), height: 1.6);
+
+    if (_fontFamily == 'Cairo') { titleStyle = GoogleFonts.cairo(textStyle: titleStyle); contentStyle = GoogleFonts.cairo(textStyle: contentStyle); }
+    if (_fontFamily == 'Amiri') { titleStyle = GoogleFonts.amiri(textStyle: titleStyle); contentStyle = GoogleFonts.amiri(textStyle: contentStyle); }
+    if (_fontFamily == 'Tajawal') { titleStyle = GoogleFonts.tajawal(textStyle: titleStyle); contentStyle = GoogleFonts.tajawal(textStyle: contentStyle); }
+    if (_fontFamily == 'Almarai') { titleStyle = GoogleFonts.almarai(textStyle: titleStyle); contentStyle = GoogleFonts.almarai(textStyle: contentStyle); }
+    if (_fontFamily == 'Noto Naskh Arabic') { titleStyle = GoogleFonts.notoNaskhArabic(textStyle: titleStyle); contentStyle = GoogleFonts.notoNaskhArabic(textStyle: contentStyle); }
+    if (_fontFamily == 'Reem Kufi') { titleStyle = GoogleFonts.reemKufi(textStyle: titleStyle); contentStyle = GoogleFonts.reemKufi(textStyle: contentStyle); }
+    if (_fontFamily == 'El Messiri') { titleStyle = GoogleFonts.elMessiri(textStyle: titleStyle); contentStyle = GoogleFonts.elMessiri(textStyle: contentStyle); }
+    if (_fontFamily == 'Markazi Text') { titleStyle = GoogleFonts.markaziText(textStyle: titleStyle); contentStyle = GoogleFonts.markaziText(textStyle: contentStyle); }
+    if (_fontFamily == 'Changa') { titleStyle = GoogleFonts.changa(textStyle: titleStyle); contentStyle = GoogleFonts.changa(textStyle: contentStyle); }
 
     return Scaffold(
+      // منع الكيبورد من تغطية المحتوى
+      resizeToAvoidBottomInset: true, 
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
         title: Text(widget.note == null ? 'ملاحظة جديدة' : 'تعديل الملاحظة'),
         actions: [
+          // زر التثبيت الجديد بجانب علامة الصح
+          IconButton(
+            icon: Icon(_isPinned ? Icons.push_pin : Icons.push_pin_outlined, color: _isPinned ? Colors.amber : Colors.white),
+            onPressed: () => setState(() => _isPinned = !_isPinned),
+          ),
           IconButton(icon: const Icon(Icons.check, color: Colors.white), onPressed: _saveNote),
         ],
       ),
       body: Stack(
         children: [
-          Padding(
+          // تغليف المحتوى بـ SingleChildScrollView لمنع اختفاء النص
+          SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
@@ -748,72 +889,56 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 
                 // عرض الصورة المرفقة
                 if (_imagePath != null)
-                  Stack(
-                    children: [
-                      ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(_imagePath!), height: 150, width: double.infinity, fit: BoxFit.cover)),
-                      Positioned(top: 0, right: 0, child: IconButton(icon: const Icon(Icons.close, color: Colors.red), onPressed: () => setState(() => _imagePath = null))),
-                    ],
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Stack(
+                      children: [
+                        // جعل الصورة قابلة للضغط لعرضها بالكامل
+                        GestureDetector(
+                          onTap: _viewFullImage,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12), 
+                            child: Image.file(
+                              File(_imagePath!), 
+                              height: 150, 
+                              width: double.infinity, 
+                              fit: BoxFit.cover // تغطية المساحة بالكامل
+                            )
+                          ),
+                        ),
+                        Positioned(top: 0, right: 0, child: IconButton(icon: const Icon(Icons.close, color: Colors.red), onPressed: () => setState(() => _imagePath = null))),
+                      ],
+                    ),
                   ),
                 
                 // عرض الصوت المرفق
                 if (_audioPath != null)
-                  Row(
-                    children: [
-                      IconButton(icon: const Icon(Icons.play_circle, color: Colors.green, size: 30), onPressed: _playAudio),
-                      const Text('تسجيل صوتي مرفق', style: TextStyle(color: Colors.green)),
-                      const Spacer(),
-                      IconButton(icon: const Icon(Icons.close, color: Colors.red), onPressed: () => setState(() => _audioPath = null)),
-                    ],
-                  ),
-
-                Expanded(
-                  child: TextField(
-                    controller: _contentController,
-                    maxLines: null,
-                    style: TextStyle(fontSize: 16, color: _currentTextColor.withOpacity(0.8), height: 1.6),
-                    decoration: const InputDecoration(hintText: 'اكتب ملاحظتك هنا...', hintStyle: TextStyle(color: Colors.white30), border: InputBorder.none),
-                  ),
-                ),
-                
-                // شريط الأدوات
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white12))),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
                     child: Row(
                       children: [
-                        IconButton(icon: const Icon(Icons.image_outlined, color: Colors.white70), onPressed: _pickImage),
-                        IconButton(
-                          icon: Icon(_isRecording ? Icons.stop_circle : Icons.mic_none, color: _isRecording ? Colors.red : Colors.white70), 
-                          onPressed: _toggleRecording
-                        ),
-                        IconButton(icon: const Icon(Icons.color_lens_outlined, color: Colors.white70), onPressed: _pickColor),
-                        IconButton(icon: const Icon(Icons.text_fields, color: Colors.white70), onPressed: _pickFont),
-                        IconButton(
-                          icon: Icon(Icons.calculate_outlined, color: _isCalcOpen ? Colors.white : Colors.white70),
-                          onPressed: () => setState(() => _isCalcOpen = !_isCalcOpen),
-                        ),
-                        DropdownButton<String>(
-                          value: _selectedCategory,
-                          dropdownColor: const Color(0xFF1E1E1E),
-                          underline: Container(),
-                          icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                          style: const TextStyle(color: Colors.white),
-                          items: ['عام', 'العمل', 'الدراسة', 'شخصي'].map((String value) {
-                            return DropdownMenuItem<String>(value: value, child: Text(value));
-                          }).toList(),
-                          onChanged: (newValue) => setState(() => _selectedCategory = newValue!),
-                        ),
+                        IconButton(icon: const Icon(Icons.play_circle, color: Colors.green, size: 30), onPressed: _playAudio),
+                        Expanded(child: Text(_audioName ?? 'تسجيل صوتي', style: const TextStyle(color: Colors.white70))),
+                        IconButton(icon: const Icon(Icons.edit, color: Colors.blueGrey, size: 20), onPressed: _renameAudio),
+                        IconButton(icon: const Icon(Icons.close, color: Colors.red, size: 20), onPressed: () => setState(() => _audioPath = null)),
                       ],
                     ),
                   ),
+
+                const SizedBox(height: 10),
+                // حقل النص
+                TextField(
+                  controller: _contentController,
+                  maxLines: null,
+                  style: contentStyle,
+                  decoration: const InputDecoration(hintText: 'اكتب ملاحظتك هنا...', hintStyle: TextStyle(color: Colors.white30), border: InputBorder.none),
                 ),
               ],
             ),
           ),
           
-          // نافذة الحاسبة
+          // الحاسبة العائمة
           if (_isCalcOpen)
             Positioned(
               bottom: 80, left: 20, right: 20,
@@ -822,7 +947,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // شريط علوي للحاسبة مع زر إغلاق
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -831,11 +955,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                           onTap: () => setState(() => _isCalcOpen = false),
                           child: Container(
                             padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white24),
-                            ),
+                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: Colors.white24)),
                             child: const Icon(Icons.close, color: Colors.white, size: 20),
                           ),
                         ),
@@ -865,12 +985,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 12)),
                         onPressed: _insertResult,
                         icon: const Icon(Icons.input, size: 18),
                         label: const Text('إدراج النتيجة في النص', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -881,6 +996,39 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
               ),
             ),
         ],
+      ),
+      // شريط الأدوات السفلي
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white12)), color: Color(0xFF0A0A0A)),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              IconButton(icon: const Icon(Icons.image_outlined, color: Colors.white70), onPressed: _pickImage),
+              // تغيير شكل زر التسجيل
+              IconButton(
+                icon: Icon(_isRecording ? Icons.stop_circle : Icons.mic_none, color: _isRecording ? Colors.red : Colors.white70), 
+                onPressed: _toggleRecording
+              ),
+              IconButton(icon: const Icon(Icons.color_lens_outlined, color: Colors.white70), onPressed: _pickColor),
+              IconButton(icon: const Icon(Icons.text_fields, color: Colors.white70), onPressed: _pickFont),
+              IconButton(icon: Icon(Icons.calculate_outlined, color: _isCalcOpen ? Colors.white : Colors.white70), onPressed: () => setState(() => _isCalcOpen = !_isCalcOpen)),
+              DropdownButton<String>(
+                value: _selectedCategory,
+                dropdownColor: const Color(0xFF1E1E1E),
+                underline: Container(),
+                icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                style: const TextStyle(color: Colors.white),
+                items: ['عام', 'العمل', 'الدراسة', 'شخصي'].map((String value) {
+                  return DropdownMenuItem<String>(value: value, child: Text(value));
+                }).toList(),
+                onChanged: (newValue) => setState(() => _selectedCategory = newValue!),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
