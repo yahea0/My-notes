@@ -43,7 +43,6 @@
         <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false" />
         
-        <!-- هذا هو السطر الأهم لأزرار الإشعارات -->
         <receiver android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" android:exported="false"/>
 
         <meta-data
