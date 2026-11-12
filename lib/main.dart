@@ -690,7 +690,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنشاء نسخة من الملاحظة')));
   }
 
-  // إعداد التذكير
+  // إعداد التذكير مع طلب إذن المنبهات
   void _setReminder() async {
     final TimeOfDay? time = await showTimePicker(
       context: context,
@@ -711,19 +711,37 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     );
 
     if (time != null) {
+      // التحقق من إذن المنبهات الدقيقة (مطلوب لأندرويد 12+)
+      final androidPlugin = flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      
+      bool canSchedule = await androidPlugin?.canScheduleExactNotifications() ?? false;
+      
+      if (!canSchedule) {
+        await androidPlugin?.requestExactAlarmsPermission();
+        canSchedule = await androidPlugin?.canScheduleExactNotifications() ?? false;
+        if (!canSchedule) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('يجب السماح بإذن المنبهات الدقيقة (Exact Alarms) لعمل التذكير.')),
+            );
+          }
+          return;
+        }
+      }
+
       final now = DateTime.now();
       final scheduledDate = DateTime(now.year, now.month, now.day, time.hour, time.minute);
       
-      if (scheduledDate.isBefore(now)) {
-        scheduledDate.add(const Duration(days: 1));
-      }
+      final finalDate = scheduledDate.isBefore(now) 
+          ? scheduledDate.add(const Duration(days: 1)) 
+          : scheduledDate;
 
-      // إعداد الإشعار
       await flutterLocalNotificationsPlugin.zonedSchedule(
         DateTime.now().millisecondsSinceEpoch.remainder(100000),
         _titleController.text.isEmpty ? 'تذكير بملاحظة' : _titleController.text,
         _contentController.text.isEmpty ? 'لديك تذكير في هذا الوقت' : _contentController.text,
-        tz.TZDateTime.from(scheduledDate, tz.local),
+        tz.TZDateTime.from(finalDate, tz.local),
         const NotificationDetails(
           android: AndroidNotificationDetails(
             'reminder_channel',
@@ -738,10 +756,12 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
 
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم ضبط التذكير في ${time.format(context)}')),
-      );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تم ضبط التذكير في ${time.format(context)}')),
+        );
+      }
     }
   }
 
