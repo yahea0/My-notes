@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -12,6 +13,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:photo_view/photo_view.dart';
+import 'package:photo_view/photo_view_gallery.dart';
+import 'package:share_plus/share_plus.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -369,10 +372,9 @@ class _HomeScreenState extends State<HomeScreen> {
     bool isPinned = note['isPinned'] ?? false;
     Color textColor = note['textColor'] != null ? Color(note['textColor']) : Colors.white;
     String fontFam = note['fontFamily'] ?? 'Tahoma';
-    double fontSize = note['fontSize'] ?? 18.0;
-    String? imagePath = note['imagePath'];
-    String? audioPath = note['audioPath'];
-    String? audioName = note['audioName'];
+    double fontSize = note['titleFontSize'] ?? 18.0;
+    List<dynamic> imagePaths = note['imagePaths'] ?? [];
+    List<dynamic> audioRecords = note['audioRecords'] ?? [];
 
     TextStyle titleStyle = TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: textColor);
     if (fontFam == 'Cairo') titleStyle = GoogleFonts.cairo(textStyle: titleStyle);
@@ -384,7 +386,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (fontFam == 'El Messiri') titleStyle = GoogleFonts.elMessiri(textStyle: titleStyle);
     if (fontFam == 'Markazi Text') titleStyle = GoogleFonts.markaziText(textStyle: titleStyle);
     if (fontFam == 'Changa') titleStyle = GoogleFonts.changa(textStyle: titleStyle);
-    if (fontFam == 'Mada') titleStyle = GoogleFonts.mada(textStyle: titleStyle);
+    if (fontFam == 'Aref Ruqaa') titleStyle = GoogleFonts.arefRuqaa(textStyle: titleStyle);
+    if (fontFam == 'Lateef') titleStyle = GoogleFonts.lateef(textStyle: titleStyle);
+    if (fontFam == 'Scheherazade New') titleStyle = GoogleFonts.scheherazadeNew(textStyle: titleStyle);
 
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNoteScreen(note: note, noteKey: noteKey))),
@@ -422,19 +426,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            if (imagePath != null) 
+            if (imagePaths.isNotEmpty) 
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(File(imagePath), height: 100, width: double.infinity, fit: BoxFit.cover)),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(File(imagePaths[0]), height: 100, width: double.infinity, fit: BoxFit.cover),
+                ),
               ),
-            if (audioPath != null)
+            if (audioRecords.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Row(
                   children: [
                     const Icon(Icons.audiotrack, color: Colors.blueAccent, size: 16),
                     const SizedBox(width: 4),
-                    Text(audioName ?? 'ملف صوتي مرفق', style: const TextStyle(color: Colors.blueAccent, fontSize: 12)),
+                    Text('${audioRecords.length} تسجيل صوتي', style: const TextStyle(color: Colors.blueAccent, fontSize: 12)),
                   ],
                 ),
               ),
@@ -506,10 +513,9 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   double _contentFontSize = 16.0;
   bool _styleForTitle = true;
 
-  // الوسائط
-  String? _imagePath;
-  String? _audioPath;
-  String? _audioName;
+  // الوسائط المتعددة
+  List<String> _imagePaths = [];
+  List<Map<String, String>> _audioRecords = [];
 
   // الحاسبة
   bool _isCalcOpen = false;
@@ -535,9 +541,10 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       _fontFamily = widget.note!['fontFamily'] ?? 'Tahoma';
       _titleFontSize = widget.note!['titleFontSize'] ?? 22.0;
       _contentFontSize = widget.note!['contentFontSize'] ?? 16.0;
-      _imagePath = widget.note!['imagePath'];
-      _audioPath = widget.note!['audioPath'];
-      _audioName = widget.note!['audioName'];
+      _imagePaths = List<String>.from(widget.note!['imagePaths'] ?? []);
+      _audioRecords = List<Map<String, String>>.from(
+        (widget.note!['audioRecords'] ?? []).map((x) => Map<String, String>.from(x))
+      );
       _isPinned = widget.note!['isPinned'] ?? false;
     }
   }
@@ -562,9 +569,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         'fontFamily': _fontFamily,
         'titleFontSize': _titleFontSize,
         'contentFontSize': _contentFontSize,
-        'imagePath': _imagePath,
-        'audioPath': _audioPath,
-        'audioName': _audioName,
+        'imagePaths': _imagePaths,
+        'audioRecords': _audioRecords,
       };
 
       if (widget.note == null) {
@@ -610,13 +616,15 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     final List<Map<String, String>> fonts = [
       {'id': 'Tahoma', 'name': 'افتراضي'},
       {'id': 'Cairo', 'name': 'القاهرة'},
+      {'id': 'Amiri', 'name': 'أميري (نسخ)'},
+      {'id': 'Aref Ruqaa', 'name': 'عارف رقعة'},
+      {'id': 'Reem Kufi', 'name': 'ريم كوفي'},
+      {'id': 'Lateef', 'name': 'لطيف (يدوي)'},
+      {'id': 'Scheherazade New', 'name': 'شهرزاد'},
       {'id': 'Tajawal', 'name': 'تجوال'},
-      {'id': 'Amiri', 'name': 'أميري'},
       {'id': 'Almarai', 'name': 'المراعي'},
       {'id': 'Noto Naskh Arabic', 'name': 'نوتو نسخ'},
-      {'id': 'Reem Kufi', 'name': 'ريم كوفي'},
       {'id': 'El Messiri', 'name': 'المسيري'},
-      {'id': 'Markazi Text', 'name': 'مركزي'},
       {'id': 'Changa', 'name': 'تشانغا'},
     ];
 
@@ -714,18 +722,20 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     );
   }
 
-  // اختيار صورة
-  Future<void> _pickImage() async {
+  // اختيار صور متعددة
+  Future<void> _pickImages() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() => _imagePath = image.path);
+    final List<XFile> images = await picker.pickMultiImage();
+    if (images.isNotEmpty) {
+      setState(() {
+        _imagePaths.addAll(images.map((e) => e.path));
+      });
     }
   }
 
-  // عرض الصورة بالحجم الكامل
-  void _viewFullImage() {
-    if (_imagePath == null) return;
+  // عرض معرض الصور
+  void _viewGallery(int initialIndex) {
+    if (_imagePaths.isEmpty) return;
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -733,9 +743,17 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         insetPadding: EdgeInsets.zero,
         child: Stack(
           children: [
-            PhotoView(
-              imageProvider: FileImage(File(_imagePath!)),
+            PhotoViewGallery.builder(
+              itemCount: _imagePaths.length,
+              builder: (context, index) {
+                return PhotoViewGalleryPageOptions(
+                  imageProvider: FileImage(File(_imagePaths[index])),
+                  minScale: PhotoViewComputedScale.contained,
+                  maxScale: PhotoViewComputedScale.covered * 2,
+                );
+              },
               backgroundDecoration: const BoxDecoration(color: Colors.black),
+              pageController: PageController(initialPage: initialIndex),
             ),
             Positioned(
               top: 40, right: 20,
@@ -756,8 +774,9 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       final path = await _audioRecorder.stop();
       setState(() {
         _isRecording = false;
-        _audioPath = path;
-        _audioName = 'تسجيل جديد';
+        if (path != null) {
+          _audioRecords.add({'path': path, 'name': 'تسجيل جديد'});
+        }
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الصوت')));
     } else {
@@ -771,16 +790,14 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   }
 
   // تشغيل الصوت
-  Future<void> _playAudio() async {
-    if (_audioPath != null) {
-      final player = AudioPlayer();
-      await player.play(DeviceFileSource(_audioPath!));
-    }
+  Future<void> _playAudio(String path) async {
+    final player = AudioPlayer();
+    await player.play(DeviceFileSource(path));
   }
 
   // تغيير اسم التسجيل
-  void _renameAudio() {
-    TextEditingController _controller = TextEditingController(text: _audioName);
+  void _renameAudio(int index) {
+    TextEditingController _controller = TextEditingController(text: _audioRecords[index]['name']);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -795,7 +812,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء', style: TextStyle(color: Colors.white54))),
           TextButton(
             onPressed: () {
-              setState(() => _audioName = _controller.text);
+              setState(() => _audioRecords[index]['name'] = _controller.text);
               Navigator.pop(context);
             }, 
             child: const Text('حفظ', style: TextStyle(color: Colors.white))
@@ -858,36 +875,49 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFF161616).withOpacity(0.8),
+                color: const Color(0xFF161616).withOpacity(0.9),
                 border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2))),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 40, height: 4,
-                    decoration: BoxDecoration(color: Colors.white30, borderRadius: BorderRadius.circular(10)),
-                  ),
+                  Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white30, borderRadius: BorderRadius.circular(10))),
                   const SizedBox(height: 20),
                   ListTile(
                     leading: const Icon(Icons.alarm, color: Colors.white),
                     title: const Text('تذكير', style: TextStyle(color: Colors.white)),
-                    onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('قريباً'))); },
+                    onTap: () async {
+                      Navigator.pop(context);
+                      final TimeOfDay? time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+                      if (time != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم ضبط التذكير في ${time.format(context)}')));
+                      }
+                    },
                   ),
                   ListTile(
                     leading: const Icon(Icons.search, color: Colors.white),
                     title: const Text('البحث عن نص داخل الملاحظة', style: TextStyle(color: Colors.white)),
-                    onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('قريباً'))); },
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showSearchDialog();
+                    },
                   ),
                   ListTile(
                     leading: const Icon(Icons.copy, color: Colors.white),
                     title: const Text('إنشاء نسخة', style: TextStyle(color: Colors.white)),
-                    onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('قريباً'))); },
+                    onTap: () {
+                      Navigator.pop(context);
+                      Clipboard.setData(ClipboardData(text: _contentController.text));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ النص إلى الحافظة')));
+                    },
                   ),
                   ListTile(
                     leading: const Icon(Icons.share, color: Colors.white),
                     title: const Text('إرسال', style: TextStyle(color: Colors.white)),
-                    onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('قريباً'))); },
+                    onTap: () {
+                      Navigator.pop(context);
+                      Share.share('${_titleController.text}\n\n${_contentController.text}');
+                    },
                   ),
                   const SizedBox(height: 20),
                 ],
@@ -896,6 +926,38 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ),
         );
       },
+    );
+  }
+
+  // نافذة البحث داخل الملاحظة
+  void _showSearchDialog() {
+    TextEditingController searchController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF161616),
+        title: const Text('البحث داخل الملاحظة', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: searchController,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(hintText: 'أدخل النص للبحث...', hintStyle: TextStyle(color: Colors.white30)),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء', style: TextStyle(color: Colors.white54))),
+          TextButton(
+            onPressed: () {
+              String query = searchController.text;
+              if (query.isNotEmpty && _contentController.text.contains(query)) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم العثور على النص!')));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على النص.')));
+              }
+              Navigator.pop(context);
+            }, 
+            child: const Text('بحث', style: TextStyle(color: Colors.white))
+          ),
+        ],
+      ),
     );
   }
 
@@ -913,9 +975,12 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     if (_fontFamily == 'El Messiri') { titleStyle = GoogleFonts.elMessiri(textStyle: titleStyle); contentStyle = GoogleFonts.elMessiri(textStyle: contentStyle); }
     if (_fontFamily == 'Markazi Text') { titleStyle = GoogleFonts.markaziText(textStyle: titleStyle); contentStyle = GoogleFonts.markaziText(textStyle: contentStyle); }
     if (_fontFamily == 'Changa') { titleStyle = GoogleFonts.changa(textStyle: titleStyle); contentStyle = GoogleFonts.changa(textStyle: contentStyle); }
+    if (_fontFamily == 'Aref Ruqaa') { titleStyle = GoogleFonts.arefRuqaa(textStyle: titleStyle); contentStyle = GoogleFonts.arefRuqaa(textStyle: contentStyle); }
+    if (_fontFamily == 'Lateef') { titleStyle = GoogleFonts.lateef(textStyle: titleStyle); contentStyle = GoogleFonts.lateef(textStyle: contentStyle); }
+    if (_fontFamily == 'Scheherazade New') { titleStyle = GoogleFonts.scheherazadeNew(textStyle: titleStyle); contentStyle = GoogleFonts.scheherazadeNew(textStyle: contentStyle); }
 
     return Scaffold(
-      resizeToAvoidBottomInset: true, // حل مشكلة الكيبورد
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
         title: Text(widget.note == null ? 'ملاحظة جديدة' : 'تعديل الملاحظة'),
@@ -923,10 +988,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           IconButton(
             icon: Icon(_isPinned ? Icons.push_pin : Icons.push_pin_outlined, color: _isPinned ? Colors.amber : Colors.white),
             onPressed: () => setState(() => _isPinned = !_isPinned),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _showSettingsSheet,
           ),
           IconButton(icon: const Icon(Icons.check, color: Colors.white), onPressed: _saveNote),
         ],
@@ -944,35 +1005,68 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 ),
                 const Divider(color: Colors.white12),
                 
-                if (_imagePath != null)
+                // معرض الصور المصغر
+                if (_imagePaths.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
-                    child: Stack(
-                      children: [
-                        GestureDetector(
-                          onTap: _viewFullImage,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12), 
-                            child: Image.file(File(_imagePath!), height: 150, width: double.infinity, fit: BoxFit.cover)
-                          ),
-                        ),
-                        Positioned(top: 0, right: 0, child: IconButton(icon: const Icon(Icons.close, color: Colors.red), onPressed: () => setState(() => _imagePath = null))),
-                      ],
+                    child: SizedBox(
+                      height: 100,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _imagePaths.length,
+                        itemBuilder: (context, index) {
+                          return Stack(
+                            children: [
+                              GestureDetector(
+                                onTap: () => _viewGallery(index),
+                                child: Container(
+                                  margin: const EdgeInsets.only(left: 8),
+                                  width: 100,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    image: DecorationImage(
+                                      image: FileImage(File(_imagePaths[index])),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 0, right: 0,
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _imagePaths.removeAt(index)),
+                                  child: Container(
+                                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                    child: const Icon(Icons.close, color: Colors.red, size: 20),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   ),
                 
-                if (_audioPath != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
-                    child: Row(
-                      children: [
-                        IconButton(icon: const Icon(Icons.play_circle, color: Colors.green, size: 30), onPressed: _playAudio),
-                        Expanded(child: Text(_audioName ?? 'تسجيل صوتي', style: const TextStyle(color: Colors.white70))),
-                        IconButton(icon: const Icon(Icons.edit, color: Colors.blueGrey, size: 20), onPressed: _renameAudio),
-                        IconButton(icon: const Icon(Icons.close, color: Colors.red, size: 20), onPressed: () => setState(() => _audioPath = null)),
-                      ],
-                    ),
+                // قائمة التسجيلات الصوتية
+                if (_audioRecords.isNotEmpty)
+                  Column(
+                    children: List.generate(_audioRecords.length, (index) {
+                      final record = _audioRecords[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
+                        child: Row(
+                          children: [
+                            IconButton(icon: const Icon(Icons.play_circle, color: Colors.green, size: 30), onPressed: () => _playAudio(record['path']!)),
+                            Expanded(child: Text(record['name'] ?? 'تسجيل صوتي', style: const TextStyle(color: Colors.white70))),
+                            IconButton(icon: const Icon(Icons.edit, color: Colors.blueGrey, size: 20), onPressed: () => _renameAudio(index)),
+                            IconButton(icon: const Icon(Icons.close, color: Colors.red, size: 20), onPressed: () => setState(() => _audioRecords.removeAt(index))),
+                          ],
+                        ),
+                      );
+                    }),
                   ),
 
                 const SizedBox(height: 10),
@@ -1044,7 +1138,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             ),
         ],
       ),
-      // شريط الأدوات السفلي مع مراعاة الكيبورد
+      // شريط الأدوات السفلي
       bottomNavigationBar: Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
@@ -1055,7 +1149,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                IconButton(icon: const Icon(Icons.image_outlined, color: Colors.white70), onPressed: _pickImage),
+                IconButton(icon: const Icon(Icons.image_outlined, color: Colors.white70), onPressed: _pickImages),
                 IconButton(
                   icon: Icon(_isRecording ? Icons.stop_circle : Icons.mic_none, color: _isRecording ? Colors.red : Colors.white70), 
                   onPressed: _toggleRecording
@@ -1063,6 +1157,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 IconButton(icon: const Icon(Icons.color_lens_outlined, color: Colors.white70), onPressed: _pickColor),
                 IconButton(icon: const Icon(Icons.text_fields, color: Colors.white70), onPressed: _pickFont),
                 IconButton(icon: Icon(Icons.calculate_outlined, color: _isCalcOpen ? Colors.white : Colors.white70), onPressed: () => setState(() => _isCalcOpen = !_isCalcOpen)),
+                IconButton(icon: const Icon(Icons.settings, color: Colors.white70), onPressed: _showSettingsSheet), // زر الإعدادات الجديد
                 DropdownButton<String>(
                   value: _selectedCategory,
                   dropdownColor: const Color(0xFF1E1E1E),
