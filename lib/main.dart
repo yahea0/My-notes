@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data'; // ضروري لاستخدام Int32List
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -688,7 +688,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنشاء نسخة من الملاحظة')));
   }
 
-  // دالة التذكير المعدلة (منبه مستمر)
+  // دالة التذكير المعدلة (منبه مستمر - تم إزالة const)
   void _setReminder() async {
     final TimeOfDay? time = await showTimePicker(
       context: context,
@@ -727,7 +727,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         }
       }
 
-      // طلب إذن الشاشة الكاملة (Full Screen Intent) لأندرويد 14+
       await androidPlugin?.requestFullScreenIntentPermission();
 
       final now = DateTime.now();
@@ -737,25 +736,25 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ? scheduledDate.add(const Duration(days: 1)) 
           : scheduledDate;
 
-      // إعداد المنبه المستمر
+      // الحل: إزالة const من NotificationDetails و AndroidNotificationDetails
       await flutterLocalNotificationsPlugin.zonedSchedule(
         DateTime.now().millisecondsSinceEpoch.remainder(100000),
         _titleController.text.isEmpty ? 'تذكير بملاحظة' : _titleController.text,
         _contentController.text.isEmpty ? 'لديك تذكير في هذا الوقت' : _contentController.text,
         tz.TZDateTime.from(finalDate, tz.local),
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'reminder_alarm_channel_v1', // معرف قناة جديد للمنبهات المستمرة
+        NotificationDetails( // <--- تم إزالة const
+          android: AndroidNotificationDetails( // <--- تم إزالة const
+            'reminder_alarm_channel_v2', // معرف قناة جديد
             'المنبهات المستمرة',
             channelDescription: 'منبهات لا تتوقف حتى يتم إيقافها',
             importance: Importance.max,
             priority: Priority.high,
             playSound: true,
             enableVibration: true,
-            category: AndroidNotificationCategory.alarm, // تصنيف كمنبه
-            fullScreenIntent: true, // إظهار على شاشة القفل
-            ongoing: true, // منع الإغلاق التلقائي
-            autoCancel: false, // لا يختفي عند الضغط
+            category: AndroidNotificationCategory.alarm,
+            fullScreenIntent: true,
+            ongoing: true,
+            autoCancel: false,
             additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT = 4 (الرنين المستمر)
           ),
         ),
