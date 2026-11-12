@@ -517,15 +517,14 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   List<String> _imagePaths = [];
   List<Map<String, String>> _audioRecords = [];
 
-  // الحاسبة
-  bool _isCalcOpen = false;
+  // الحاسبة (متغيرات محلية)
   String _calcDisplay = '0';
 
   // الصوت
   final AudioRecorder _audioRecorder = AudioRecorder();
   bool _isRecording = false;
-  String? _currentlyPlayingPath; // لتتبع الصوت الذي يعمل الآن
-  final AudioPlayer _audioPlayer = AudioPlayer(); // مشغل الصوت
+  String? _currentlyPlayingPath;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   // التثبيت
   bool _isPinned = false;
@@ -550,7 +549,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       _isPinned = widget.note!['isPinned'] ?? false;
     }
 
-    // الاستماع لانتهاء الصوت
     _audioPlayer.onPlayerComplete.listen((event) {
       if (mounted) {
         setState(() => _currentlyPlayingPath = null);
@@ -787,7 +785,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   // تسجيل صوت
   Future<void> _toggleRecording() async {
     if (_isRecording) {
-      // إيقاف التسجيل
       try {
         final path = await _audioRecorder.stop();
         setState(() {
@@ -802,7 +799,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
       }
     } else {
-      // بدء التسجيل
       try {
         if (await _audioRecorder.hasPermission()) {
           final dir = await getApplicationDocumentsDirectory();
@@ -857,43 +853,137 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     );
   }
 
-  // الحاسبة
-  void _onCalcButtonPressed(String value) {
-    setState(() {
-      if (value == 'C') { _calcDisplay = '0'; } 
-      else if (value == '⌫') {
-        if (_calcDisplay.isNotEmpty && _calcDisplay != '0') {
-          _calcDisplay = _calcDisplay.substring(0, _calcDisplay.length - 1);
-          if (_calcDisplay.isEmpty) _calcDisplay = '0';
-        }
-      } else if (value == '=') {
-        try {
-          String exp = _calcDisplay.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
-          Parser p = Parser();
-          Expression expParsed = p.parse(exp);
-          ContextModel cm = ContextModel();
-          double eval = expParsed.evaluate(EvaluationType.REAL, cm);
-          _calcDisplay = eval.toStringAsFixed(eval.truncateToDouble() == eval ? 0 : 2);
-        } catch (e) { _calcDisplay = 'خطأ'; }
-      } else {
-        if (_calcDisplay == '0' && value != '.') { _calcDisplay = value; } 
-        else { _calcDisplay += value; }
-      }
-    });
-  }
-
-  void _insertResult() {
-    if (_calcDisplay != 'خطأ') {
+  // دالة إدراج النتيجة في النص
+  void _insertResult(String result) {
+    if (result != 'خطأ') {
       final text = _contentController.text;
       final selection = _contentController.selection;
       if (selection.start == -1) {
-        _contentController.text = text + _calcDisplay;
+        _contentController.text = text + result;
       } else {
-        final newText = text.replaceRange(selection.start, selection.end, _calcDisplay);
-        _contentController.value = TextEditingValue(text: newText, selection: TextSelection.collapsed(offset: selection.start + _calcDisplay.length));
+        final newText = text.replaceRange(selection.start, selection.end, result);
+        _contentController.value = TextEditingValue(text: newText, selection: TextSelection.collapsed(offset: selection.start + result.length));
       }
-      setState(() => _isCalcOpen = false);
     }
+  }
+
+  // نافذة الحاسبة (محدثة كلياً لتعمل كنافذة منبثقة احترافية)
+  void _showCalculatorDialog() {
+    _calcDisplay = '0'; // تصفير الحاسبة عند الفتح
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+              child: GlassContainer(
+                padding: const EdgeInsets.all(16),
+                borderRadius: 24,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // الشريط العلوي
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('الحاسبة', style: TextStyle(color: Colors.white54, fontSize: 14)),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: Colors.white24)),
+                            child: const Icon(Icons.close, color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // شاشة العرض
+                    Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      child: Text(_calcDisplay, style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // الأزرار
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(), // لمنع التمرير داخل النافذة
+                      crossAxisCount: 4,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 1.2, // تناسب حجم الأزرار
+                      children: ['C', '⌫', '%', '÷', '7', '8', '9', '×', '4', '5', '6', '−', '1', '2', '3', '+', '0', '.', '='].map((e) {
+                        bool isEq = e == '=';
+                        return InkWell(
+                          onTap: () {
+                            setModalState(() {
+                              if (e == 'C') {
+                                _calcDisplay = '0';
+                              } else if (e == '⌫') {
+                                if (_calcDisplay.isNotEmpty && _calcDisplay != '0') {
+                                  _calcDisplay = _calcDisplay.substring(0, _calcDisplay.length - 1);
+                                  if (_calcDisplay.isEmpty) _calcDisplay = '0';
+                                }
+                              } else if (e == '=') {
+                                try {
+                                  String exp = _calcDisplay.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
+                                  Parser p = Parser();
+                                  Expression expParsed = p.parse(exp);
+                                  ContextModel cm = ContextModel();
+                                  double eval = expParsed.evaluate(EvaluationType.REAL, cm);
+                                  _calcDisplay = eval.toStringAsFixed(eval.truncateToDouble() == eval ? 0 : 2);
+                                } catch (err) {
+                                  _calcDisplay = 'خطأ';
+                                }
+                              } else {
+                                if (_calcDisplay == '0' && e != '.') {
+                                  _calcDisplay = e;
+                                } else {
+                                  _calcDisplay += e;
+                                }
+                              }
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(color: isEq ? Colors.white : Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
+                            child: Center(child: Text(e, style: TextStyle(fontSize: 20, color: isEq ? Colors.black : Colors.white))),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // زر الإدراج
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          _insertResult(_calcDisplay);
+                          Navigator.pop(context); // إغلاق النافذة
+                        },
+                        icon: const Icon(Icons.input, size: 18),
+                        label: const Text('إدراج النتيجة في النص', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   // نافذة الإعدادات الزجاجية
@@ -1027,195 +1117,132 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           IconButton(icon: const Icon(Icons.check, color: Colors.white), onPressed: _saveNote),
         ],
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                // شريط التسجيل النشط (يظهر فقط أثناء التسجيل)
-                if (_isRecording)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.red.withOpacity(0.5)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.mic, color: Colors.red, size: 28),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'جاري التسجيل الآن...',
-                            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: _toggleRecording,
-                          icon: const Icon(Icons.stop, size: 20),
-                          label: const Text('إيقاف'),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                TextField(
-                  controller: _titleController,
-                  style: titleStyle,
-                  decoration: const InputDecoration(hintText: 'عنوان الملاحظة...', hintStyle: TextStyle(color: Colors.white30), border: InputBorder.none),
+      body: SingleChildScrollView( // تم إزالة Stack لأن الحاسبة أصبحت Dialog
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // شريط التسجيل النشط
+            if (_isRecording)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.withOpacity(0.5)),
                 ),
-                const Divider(color: Colors.white12),
-                
-                // معرض الصور المصغر
-                if (_imagePaths.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0),
-                    child: SizedBox(
-                      height: 100,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _imagePaths.length,
-                        itemBuilder: (context, index) {
-                          return Stack(
-                            children: [
-                              GestureDetector(
-                                onTap: () => _viewGallery(index),
-                                child: Container(
-                                  margin: const EdgeInsets.only(left: 8),
-                                  width: 100,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    image: DecorationImage(
-                                      image: FileImage(File(_imagePaths[index])),
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                top: 0, right: 0,
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _imagePaths.removeAt(index)),
-                                  child: Container(
-                                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                                    child: const Icon(Icons.close, color: Colors.red, size: 20),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                
-                // قائمة التسجيلات الصوتية
-                if (_audioRecords.isNotEmpty)
-                  Column(
-                    children: List.generate(_audioRecords.length, (index) {
-                      final record = _audioRecords[index];
-                      bool isPlayingThis = _currentlyPlayingPath == record['path'];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
-                        child: Row(
-                          children: [
-                            // زر التشغيل / الإيقاف المؤقت
-                            IconButton(
-                              icon: Icon(
-                                isPlayingThis ? Icons.pause_circle_filled : Icons.play_circle_fill,
-                                color: isPlayingThis ? Colors.red : Colors.green, 
-                                size: 30
-                              ), 
-                              onPressed: () => _togglePlayAudio(record['path']!)
-                            ),
-                            Expanded(child: Text(record['name'] ?? 'تسجيل صوتي', style: const TextStyle(color: Colors.white70))),
-                            IconButton(icon: const Icon(Icons.edit, color: Colors.blueGrey, size: 20), onPressed: () => _renameAudio(index)),
-                            IconButton(icon: const Icon(Icons.close, color: Colors.red, size: 20), onPressed: () => setState(() => _audioRecords.removeAt(index))),
-                          ],
-                        ),
-                      );
-                    }),
-                  ),
-
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _contentController,
-                  maxLines: null,
-                  style: contentStyle,
-                  decoration: const InputDecoration(hintText: 'اكتب ملاحظتك هنا...', hintStyle: TextStyle(color: Colors.white30), border: InputBorder.none),
-                ),
-              ],
-            ),
-          ),
-          
-          // الحاسبة
-          if (_isCalcOpen)
-            Positioned(
-              bottom: 80, left: 20, right: 20,
-              child: GlassContainer(
-                borderRadius: 24, padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('الحاسبة', style: TextStyle(color: Colors.white54, fontSize: 14)),
-                        GestureDetector(
-                          onTap: () => setState(() => _isCalcOpen = false),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: Colors.white24)),
-                            child: const Icon(Icons.close, color: Colors.white, size: 20),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.all(12),
-                      child: Text(_calcDisplay, style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(height: 8),
-                    GridView.count(
-                      shrinkWrap: true, crossAxisCount: 4, mainAxisSpacing: 8, crossAxisSpacing: 8,
-                      children: ['C', '⌫', '%', '÷', '7', '8', '9', '×', '4', '5', '6', '−', '1', '2', '3', '+', '0', '.', '='].map((e) {
-                        bool isEq = e == '=';
-                        return InkWell(
-                          onTap: () => _onCalcButtonPressed(e),
-                          child: Container(
-                            decoration: BoxDecoration(color: isEq ? Colors.white : Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
-                            child: Center(child: Text(e, style: TextStyle(fontSize: 20, color: isEq ? Colors.black : Colors.white))),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 12)),
-                        onPressed: _insertResult,
-                        icon: const Icon(Icons.input, size: 18),
-                        label: const Text('إدراج النتيجة في النص', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Icon(Icons.mic, color: Colors.red, size: 28),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'جاري التسجيل الآن...',
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
                       ),
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _toggleRecording,
+                      icon: const Icon(Icons.stop, size: 20),
+                      label: const Text('إيقاف'),
                     ),
                   ],
                 ),
               ),
+
+            TextField(
+              controller: _titleController,
+              style: titleStyle,
+              decoration: const InputDecoration(hintText: 'عنوان الملاحظة...', hintStyle: TextStyle(color: Colors.white30), border: InputBorder.none),
             ),
-        ],
+            const Divider(color: Colors.white12),
+            
+            // معرض الصور المصغر
+            if (_imagePaths.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: SizedBox(
+                  height: 100,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _imagePaths.length,
+                    itemBuilder: (context, index) {
+                      return Stack(
+                        children: [
+                          GestureDetector(
+                            onTap: () => _viewGallery(index),
+                            child: Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              width: 100,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                image: DecorationImage(
+                                  image: FileImage(File(_imagePaths[index])),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 0, right: 0,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _imagePaths.removeAt(index)),
+                              child: Container(
+                                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                child: const Icon(Icons.close, color: Colors.red, size: 20),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            
+            // قائمة التسجيلات الصوتية
+            if (_audioRecords.isNotEmpty)
+              Column(
+                children: List.generate(_audioRecords.length, (index) {
+                  final record = _audioRecords[index];
+                  bool isPlayingThis = _currentlyPlayingPath == record['path'];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            isPlayingThis ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                            color: isPlayingThis ? Colors.red : Colors.green, 
+                            size: 30
+                          ), 
+                          onPressed: () => _togglePlayAudio(record['path']!)
+                        ),
+                        Expanded(child: Text(record['name'] ?? 'تسجيل صوتي', style: const TextStyle(color: Colors.white70))),
+                        IconButton(icon: const Icon(Icons.edit, color: Colors.blueGrey, size: 20), onPressed: () => _renameAudio(index)),
+                        IconButton(icon: const Icon(Icons.close, color: Colors.red, size: 20), onPressed: () => setState(() => _audioRecords.removeAt(index))),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+
+            const SizedBox(height: 10),
+            TextField(
+              controller: _contentController,
+              maxLines: null,
+              style: contentStyle,
+              decoration: const InputDecoration(hintText: 'اكتب ملاحظتك هنا...', hintStyle: TextStyle(color: Colors.white30), border: InputBorder.none),
+            ),
+          ],
+        ),
       ),
       // شريط الأدوات السفلي
       bottomNavigationBar: Padding(
@@ -1238,7 +1265,10 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 
                 IconButton(icon: const Icon(Icons.color_lens_outlined, color: Colors.white70), onPressed: _pickColor),
                 IconButton(icon: const Icon(Icons.text_fields, color: Colors.white70), onPressed: _pickFont),
-                IconButton(icon: Icon(Icons.calculate_outlined, color: _isCalcOpen ? Colors.white : Colors.white70), onPressed: () => setState(() => _isCalcOpen = !_isCalcOpen)),
+                
+                // زر الحاسبة (يستدعي النافذة المنبثقة الآن)
+                IconButton(icon: const Icon(Icons.calculate_outlined, color: Colors.white70), onPressed: _showCalculatorDialog),
+                
                 IconButton(icon: const Icon(Icons.settings, color: Colors.white70), onPressed: _showSettingsSheet),
                 DropdownButton<String>(
                   value: _selectedCategory,
