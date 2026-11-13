@@ -1,236 +1,203 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
+import 'package:google_fonts/google_fonts.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
-final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-    FlutterLocalNotificationsPlugin();
+const List<Map<String, String>> kOnyxFonts = [
+  {'id': 'Tahoma', 'name': 'افتراضي'},
+  {'id': 'Cairo', 'name': 'القاهرة'},
+  {'id': 'Amiri', 'name': 'أميري (نسخ)'},
+  {'id': 'Aref Ruqaa', 'name': 'عارف رقعة'},
+  {'id': 'Reem Kufi', 'name': 'ريم كوفي'},
+  {'id': 'Lateef', 'name': 'لطيف (يدوي)'},
+  {'id': 'Scheherazade New', 'name': 'شهرزاد'},
+  {'id': 'Tajawal', 'name': 'تجوال'},
+  {'id': 'Almarai', 'name': 'المراعي'},
+  {'id': 'Noto Naskh Arabic', 'name': 'نوتو نسخ'},
+  {'id': 'El Messiri', 'name': 'المسيري'},
+  {'id': 'Changa', 'name': 'تشانغا'},
+];
 
-const MethodChannel alarmMethodChannel =
-    MethodChannel('com.example.my_notes/alarm');
-
-@pragma('vm:entry-point')
-void notificationTapBackground(NotificationResponse notificationResponse) async {
-  if (notificationResponse.actionId == 'snooze_action') {
-    try {
-      WidgetsFlutterBinding.ensureInitialized();
-      tz.initializeTimeZones();
-
-      final int snoozeId = (notificationResponse.id != null &&
-              notificationResponse.id! > 0)
-          ? notificationResponse.id!
-          : (DateTime.now().millisecondsSinceEpoch.remainder(90000) + 1);
-
-      final snoozeDate = tz.TZDateTime.from(
-        DateTime.now().add(const Duration(minutes: 5)),
-        tz.local,
-      );
-
-      final String reminderTitle =
-          (notificationResponse.payload ?? '').trim().isEmpty
-              ? 'تذكير بملاحظة'
-              : notificationResponse.payload!;
-
-      await flutterLocalNotificationsPlugin.zonedSchedule(
-        snoozeId,
-        reminderTitle,
-        'لديك تذكير في هذا الوقت (غفوة)',
-        snoozeDate,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            'reminder_alarm_channel_v3',
-            'المنبهات المستمرة',
-            channelDescription: 'منبهات لا تتوقف حتى يتم إيقافها',
-            importance: Importance.max,
-            priority: Priority.high,
-            playSound: true,
-            enableVibration: true,
-            category: AndroidNotificationCategory.alarm,
-            fullScreenIntent: true,
-            ongoing: true,
-            autoCancel: false,
-            additionalFlags: Int32List.fromList([4]),
-            actions: const <AndroidNotificationAction>[
-              AndroidNotificationAction(
-                'dismiss_action',
-                'إيقاف',
-                cancelNotification: true,
-                showsUserInterface: false,
-              ),
-              AndroidNotificationAction(
-                'snooze_action',
-                'غفوة (5 دقائق)',
-                cancelNotification: true,
-                showsUserInterface: false,
-              ),
-            ],
-          ),
-        ),
-        payload: reminderTitle,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
-    } catch (e) {
-      debugPrint('Error in background snooze: $e');
+TextStyle applyArabicFont(String fontId, TextStyle base) {
+  try {
+    switch (fontId) {
+      case 'Cairo':
+        return GoogleFonts.cairo(textStyle: base);
+      case 'Amiri':
+        return GoogleFonts.amiri(textStyle: base);
+      case 'Tajawal':
+        return GoogleFonts.tajawal(textStyle: base);
+      case 'Almarai':
+        return GoogleFonts.almarai(textStyle: base);
+      case 'Noto Naskh Arabic':
+        return GoogleFonts.notoNaskhArabic(textStyle: base);
+      case 'Reem Kufi':
+        return GoogleFonts.reemKufi(textStyle: base);
+      case 'El Messiri':
+        return GoogleFonts.elMessiri(textStyle: base);
+      case 'Markazi Text':
+        return GoogleFonts.markaziText(textStyle: base);
+      case 'Changa':
+        return GoogleFonts.changa(textStyle: base);
+      case 'Aref Ruqaa':
+        return GoogleFonts.arefRuqaa(textStyle: base);
+      case 'Lateef':
+        return GoogleFonts.lateef(textStyle: base);
+      case 'Scheherazade New':
+        return GoogleFonts.scheherazadeNew(textStyle: base);
+      default:
+        return base;
     }
+  } catch (_) {
+    return base;
   }
 }
 
-class NotificationService {
-  static Future<void> initNotifications() async {
-    tz.initializeTimeZones();
-    try {
-      final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(timeZoneName));
-    } catch (_) {
-      tz.setLocalLocation(tz.UTC);
+class OnyxPalette {
+  final bool isDark;
+  final Color scaffoldBg;
+  final Color voidBg;
+  final Color elevatedBg;
+  final Color cardTop;
+  final Color cardBottom;
+  final Color glassHighlight;
+  final Color glassBorder;
+  final Color glassStrongBorder;
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color textMuted;
+  final Color accent;
+  final Color onAccent;
+  final Color shadowDeep;
+  final Color shadowSoft;
+  final Color chipBg;
+  final Color divider;
+  final Color inputFill;
+  final Color danger;
+
+  const OnyxPalette({
+    required this.isDark,
+    required this.scaffoldBg,
+    required this.voidBg,
+    required this.elevatedBg,
+    required this.cardTop,
+    required this.cardBottom,
+    required this.glassHighlight,
+    required this.glassBorder,
+    required this.glassStrongBorder,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.textMuted,
+    required this.accent,
+    required this.onAccent,
+    required this.shadowDeep,
+    required this.shadowSoft,
+    required this.chipBg,
+    required this.divider,
+    required this.inputFill,
+    required this.danger,
+  });
+
+  factory OnyxPalette.of(bool isDark) {
+    if (isDark) {
+      return OnyxPalette(
+        isDark: true,
+        scaffoldBg: const Color(0xFF070709),
+        voidBg: const Color(0xFF030304),
+        elevatedBg: const Color(0xFF121318),
+        cardTop: Colors.white.withOpacity(0.11),
+        cardBottom: Colors.white.withOpacity(0.025),
+        glassHighlight: Colors.white.withOpacity(0.24),
+        glassBorder: Colors.white.withOpacity(0.14),
+        glassStrongBorder: Colors.white.withOpacity(0.32),
+        textPrimary: Colors.white,
+        textSecondary: Colors.white.withOpacity(0.76),
+        textMuted: Colors.white.withOpacity(0.45),
+        accent: Colors.white,
+        onAccent: const Color(0xFF08080A),
+        shadowDeep: Colors.black.withOpacity(0.82),
+        shadowSoft: Colors.white.withOpacity(0.07),
+        chipBg: Colors.white.withOpacity(0.07),
+        divider: Colors.white.withOpacity(0.10),
+        inputFill: Colors.white.withOpacity(0.05),
+        danger: const Color(0xFFFF5C6C),
+      );
     }
 
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: DarwinInitializationSettings(),
+    return OnyxPalette(
+      isDark: false,
+      scaffoldBg: const Color(0xFFF3F4F7),
+      voidBg: const Color(0xFFE7E9EF),
+      elevatedBg: Colors.white,
+      cardTop: Colors.white.withOpacity(0.95),
+      cardBottom: const Color(0xFFE9EBF2).withOpacity(0.76),
+      glassHighlight: Colors.white,
+      glassBorder: Colors.black.withOpacity(0.09),
+      glassStrongBorder: Colors.black.withOpacity(0.22),
+      textPrimary: const Color(0xFF0B0B0E),
+      textSecondary: const Color(0xFF3A3B42),
+      textMuted: const Color(0xFF71737E),
+      accent: const Color(0xFF0B0B0E),
+      onAccent: Colors.white,
+      shadowDeep: const Color(0xFF10121A).withOpacity(0.14),
+      shadowSoft: Colors.white.withOpacity(0.92),
+      chipBg: Colors.black.withOpacity(0.05),
+      divider: Colors.black.withOpacity(0.08),
+      inputFill: Colors.black.withOpacity(0.04),
+      danger: const Color(0xFFD92D3E),
     );
-
-    await flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {},
-      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
-    );
-
-    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-    if (androidImplementation != null) {
-      await androidImplementation.requestNotificationsPermission();
-      await androidImplementation.requestExactAlarmsPermission();
-    }
   }
+}
 
-  static Future<void> clearActiveNotificationsOnResume() async {
-    try {
-      final androidPlugin = flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-      final activeNotifications = await androidPlugin?.getActiveNotifications();
-      if (activeNotifications != null) {
-        for (final notification in activeNotifications) {
-          final notificationId = notification.id;
-          if (notificationId != null) {
-            await androidPlugin?.cancel(notificationId);
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error clearing active notifications: $e');
-    }
+Color resolveAdaptiveNoteColor(
+  int? rawColor,
+  OnyxPalette pal, {
+  bool isContent = false,
+}) {
+  if (rawColor == null) {
+    return isContent ? pal.textPrimary.withOpacity(0.86) : pal.textPrimary;
   }
-
-  static Future<bool> scheduleAlarmReminder({
-    required BuildContext context,
-    required TimeOfDay time,
-    required String title,
-    required String body,
-  }) async {
-    final androidPlugin = flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-
-    bool canSchedule =
-        await androidPlugin?.canScheduleExactNotifications() ?? false;
-
-    if (!canSchedule) {
-      await androidPlugin?.requestExactAlarmsPermission();
-      canSchedule =
-          await androidPlugin?.canScheduleExactNotifications() ?? false;
-      if (!canSchedule) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'يجب السماح بإذن المنبهات الدقيقة (Exact Alarms) لعمل التذكير.',
-              ),
-            ),
-          );
-        }
-        return false;
-      }
-    }
-
-    await androidPlugin?.requestFullScreenIntentPermission();
-
-    String? ringtoneUri;
-    try {
-      ringtoneUri = await alarmMethodChannel.invokeMethod('getRingtoneUri');
-    } catch (e) {
-      debugPrint('خطأ في جلب نغمة النظام: $e');
-    }
-
-    final now = DateTime.now();
-    final scheduledDate = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      time.hour,
-      time.minute,
-    );
-    final finalDate = scheduledDate.isBefore(now)
-        ? scheduledDate.add(const Duration(days: 1))
-        : scheduledDate;
-
-    final int notificationId =
-        DateTime.now().millisecondsSinceEpoch.remainder(90000) + 1;
-
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      notificationId,
-      title.trim().isEmpty ? 'تذكير بملاحظة' : title,
-      body.trim().isEmpty ? 'لديك تذكير في هذا الوقت' : body,
-      tz.TZDateTime.from(finalDate, tz.local),
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          'reminder_alarm_channel_v3',
-          'المنبهات المستمرة',
-          channelDescription: 'منبهات لا تتوقف حتى يتم إيقافها',
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          enableVibration: true,
-          category: AndroidNotificationCategory.alarm,
-          fullScreenIntent: true,
-          ongoing: true,
-          autoCancel: false,
-          additionalFlags: Int32List.fromList([4]),
-          sound: ringtoneUri != null
-              ? UriAndroidNotificationSound(ringtoneUri)
-              : const RawResourceAndroidNotificationSound('default'),
-          actions: const <AndroidNotificationAction>[
-            AndroidNotificationAction(
-              'dismiss_action',
-              'إيقاف',
-              cancelNotification: true,
-              showsUserInterface: false,
-            ),
-            AndroidNotificationAction(
-              'snooze_action',
-              'غفوة (5 دقائق)',
-              cancelNotification: true,
-              showsUserInterface: false,
-            ),
-          ],
-        ),
-      ),
-      payload: title,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
-
-    return true;
+  final int whiteVal = Colors.white.value;
+  final int blackVal = Colors.black.value;
+  if (!pal.isDark && rawColor == whiteVal) {
+    return isContent ? pal.textPrimary.withOpacity(0.86) : pal.textPrimary;
   }
+  if (pal.isDark && (rawColor == blackVal || rawColor == 0xFF0B0B0E)) {
+    return isContent ? pal.textPrimary.withOpacity(0.86) : pal.textPrimary;
+  }
+  return Color(rawColor);
+}
+
+class OnyxSettings {
+  static Box get _box => Hive.box('settings');
+
+  static bool get isDark => _box.get('isDark', defaultValue: true) as bool;
+  static Future<void> setIsDark(bool val) => _box.put('isDark', val);
+
+  static bool get enable3D => _box.get('enable3D', defaultValue: true) as bool;
+  static Future<void> setEnable3D(bool val) => _box.put('enable3D', val);
+
+  static bool get enableShimmer =>
+      _box.get('enableShimmer', defaultValue: true) as bool;
+  static Future<void> setEnableShimmer(bool val) =>
+      _box.put('enableShimmer', val);
+
+  static double get blurSigma =>
+      (_box.get('blurSigma', defaultValue: 16.0) as num).toDouble();
+  static Future<void> setBlurSigma(double val) => _box.put('blurSigma', val);
+
+  static bool get isGridView =>
+      _box.get('isGridView', defaultValue: false) as bool;
+  static Future<void> setIsGridView(bool val) => _box.put('isGridView', val);
+
+  static String get sortMode =>
+      _box.get('sortMode', defaultValue: 'pinned_newest') as String;
+  static Future<void> setSortMode(String val) => _box.put('sortMode', val);
+
+  static String get vaultPin =>
+      _box.get('vaultPin', defaultValue: '1234') as String;
+  static Future<void> setVaultPin(String val) => _box.put('vaultPin', val);
+
+  static bool get hideLocked =>
+      _box.get('hideLocked', defaultValue: true) as bool;
+  static Future<void> setHideLocked(bool val) => _box.put('hideLocked', val);
 }
