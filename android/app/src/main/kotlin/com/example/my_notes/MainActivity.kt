@@ -26,7 +26,7 @@ class MainActivity: FlutterActivity() {
                 val id = call.argument<Int>("id")
                 val title = call.argument<String>("title")
                 val delayMinutes = call.argument<Int>("delayMinutes") ?: 5
-                
+
                 if (id != null && title != null) {
                     scheduleSnoozeAlarm(this, id, title, delayMinutes)
                     result.success(true)
@@ -53,20 +53,29 @@ class MainActivity: FlutterActivity() {
 
     private fun scheduleSnoozeAlarm(context: Context, id: Int, title: String, delayMinutes: Int) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        // التوجيه إلى الخدمة الأمامية مباشرة (الحل الجذري)
+        val safeId = if (id <= 0) 1 else id
         val intent = Intent(context, SnoozeService::class.java).apply {
-            putExtra("notification_id", id)
+            putExtra("notification_id", safeId)
             putExtra("notification_title", title)
         }
-        val pendingIntent = PendingIntent.getForegroundService(
-            context,
-            id,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(
+                context,
+                safeId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getService(
+                context,
+                safeId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
 
-        val triggerTime = System.currentTimeMillis() + (delayMinutes * 60 * 1000)
-        
+        val triggerTime = System.currentTimeMillis() + (delayMinutes.toLong() * 60_000L)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (alarmManager.canScheduleExactAlarms()) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
@@ -83,7 +92,8 @@ class SnoozeService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val id = intent?.getIntExtra("notification_id", 0) ?: 0
+        val rawId = intent?.getIntExtra("notification_id", 1) ?: 1
+        val safeId = if (rawId <= 0) 1 else rawId
         val title = intent?.getStringExtra("notification_title") ?: "تذكير بملاحظة"
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -111,12 +121,34 @@ class SnoozeService : Service() {
             .setOngoing(false)
             .build()
 
-        // بدء الخدمة الأمامية لعرض الإشعار
-        startForeground(id, notification)
+        startForeground(safeId, notification)
 
-        // إيقاف الخدمة بعد عرض الإشعار
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_DETACH)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(false)
+        }
+        notificationManager.notify(safeId, notification)
         stopSelf()
 
         return START_NOT_STICKY
     }
 }
+
+الخطوة 10: إضافة تعريف الخدمة المطلوب لأندرويد 14 (targetSdkVersion 34)
+
+حدّث وسم <service> في الملف التالي:
+
+My-notes-main/android/app/src/main/AndroidManifest.xml
+
+        <!-- تسجيل الخدمة الأمامية -->
+        <service
+            android:name=".SnoozeService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Scheduled snooze alarm notification" />
+        </service>
